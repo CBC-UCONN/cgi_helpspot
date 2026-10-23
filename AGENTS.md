@@ -22,8 +22,8 @@ Server needs `--threads:on` (already in the task). `public/` and `bin/` are gene
 - `src/jsbridge.nim` – browser glue in Nim (file reading, SheetJS via the `XLSX` global, FormData, fetch). There is no hand written JS.
 - `index.html` (package root) – the page shell; copied to `public/` by `nimble web`.
 - `src/lib/*.nim` – pure Nim, must compile on both native and JS backends and stay free of DOM imports so they can be unit tested natively.
-  - `validation.nim` validators; `schema.nim` project fields and sample columns; `sheet.nim` grid validation/import/export; `csv.nim`; `ini.nim`; `yamlout.nim`.
-- `config.ini` (package root) – build-time config (HelpSpot URL, category id), embedded in `app.js` via `staticRead` and parsed by `src/lib/ini.nim`. It is not copied to `public/` or fetched at runtime. The URL must stay in this file, not in code.
+  - `validation.nim` validators; `schema.nim` project fields and sample columns; `sheet.nim` grid validation/import/export; `csv.nim`; `yamlout.nim`.
+- `config.ini` (package root) – build-time config (HelpSpot URL, category name), embedded in `app.js` via `staticRead` and parsed by `std/parsecfg` in `src/app.nim`. It is not copied to `public/` or fetched at runtime. The URL must stay in this file, not in code.
 
 ## Conventions and constraints
 

@@ -1,14 +1,14 @@
 ## Single page app: DNA sequencing project form + sample spreadsheet, submitted to HelpSpot.
 {.push warning[CStringConv]: off.} # string and cstring are both JS strings on this backend
-import std/[strutils, tables, times]
+import std/[parsecfg, streams, strutils, tables, times]
 import karax/[karax, karaxdsl, vdom, vstyles, kdom]
-import lib/[csv, ini, schema, sheet, validation, yamlout]
+import lib/[csv, schema, sheet, validation, yamlout]
 import jsbridge
 
 type
   Config = object
     helpspotUrl: string
-    categoryId: int
+    category: string
 
   Status = enum
     stIdle, stSubmitting, stSuccess, stError
@@ -20,11 +20,11 @@ const
   demo = defined(demo) # build with -d:demo (nimble webdemo) for the test data button
 
 proc parseConfig(text: string): Config =
-  let c = parseIni(text)
-  result.helpspotUrl = c.getOrDefault("helpspot.url")
+  let c = loadConfig(newStringStream(text), "config.ini")
+  result.helpspotUrl = c.getSectionValue("helpspot", "url")
   if result.helpspotUrl.len == 0:
     raise newException(ValueError, "config.ini: [helpspot] url is required")
-  result.categoryId = parseInt(c.getOrDefault("helpspot.category_id", "0"))
+  result.category = c.getSectionValue("helpspot", "category")
 
 # Read at build time; edit config.ini and rebuild to change it.
 const cfg = parseConfig(staticRead("../config.ini"))
@@ -151,7 +151,7 @@ proc submit() =
   form.append("sFirstName", project.getOrDefault("contact_first_name").strip())
   form.append("sLastName", project.getOrDefault("contact_last_name").strip())
   form.append("sEmail", project.getOrDefault("contact_email").strip())
-  if cfg.categoryId > 0: form.append("xCategory", $cfg.categoryId)
+  if cfg.category.len > 0: form.append("xCategory", cfg.category)
   form.attach(1, name & "_project.yaml", "application/x-yaml", yaml)
   form.attach(2, name & "_samples.csv", "text/csv", csvText)
 
@@ -291,7 +291,7 @@ proc renderSheet(): VNode =
       p(class = "mt-2 text-sm text-red-600"):
         text $badCells & " cell(s) need attention. Hover a highlighted cell for details."
 
-proc createDom(): VNode =
+proc renderForm(): VNode =
   let statusCls = case status
     of stSuccess: "bg-green-100 text-green-800 border-green-300"
     of stError: "bg-red-100 text-red-800 border-red-300"
@@ -338,6 +338,28 @@ proc createDom(): VNode =
           input(`type` = "number", min = "1", max = $maxAddRows, value = addCount,
                 class = "w-24 rounded border border-slate-300 px-2 py-1 text-sm",
                 oninput = proc (ev: Event; n: VNode) = addCount = $getInputText(n))
+
+proc startOver() =
+  project.clear()
+  resetGrid()
+  attempted = false
+  addCount = "5"
+  uploadMsg = ""
+  uploadIsError = false
+  status = stIdle
+  statusMsg = ""
+  activeTip = ""
+
+proc renderDone(): VNode =
+  result = buildHtml(tdiv(class = "flex min-h-screen flex-col items-center justify-center gap-4 p-6")):
+    p(class = "text-lg font-medium text-green-800", role = "status"):
+      text "Ticket submitted."
+    button(class = "rounded bg-sky-600 px-5 py-2 font-medium text-white hover:bg-sky-700",
+           onclick = proc (ev: Event; n: VNode) = startOver()):
+      text "Submit another project"
+
+proc createDom(): VNode =
+  if status == stSuccess: renderDone() else: renderForm()
 
 resetGrid()
 onEscape(proc () =

@@ -1,11 +1,5 @@
-import std/[unittest, strutils, tables]
-import ../src/lib/[csv, ini, validation, schema, sheet, yamlout]
-
-suite "ini":
-  test "sections, comments, values containing '='":
-    let c = parseIni("; c\n[helpspot]\nurl = http://x/a?b=c\n# n\ncategory_id=3\n")
-    check c["helpspot.url"] == "http://x/a?b=c"
-    check c["helpspot.category_id"] == "3"
+import std/[unittest, strutils]
+import ../src/lib/[csv, validation, schema, sheet, yamlout]
 
 suite "csv":
   test "quotes, escapes, CRLF, blank lines":

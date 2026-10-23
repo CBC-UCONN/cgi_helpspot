@@ -30,11 +30,11 @@ Deploy by copying `public/` to any static host.
 ```ini
 [helpspot]
 url = https://cbcsupport.helpspot.com/api/index.php?method=request.create
-category_id = 0
+category =
 ```
 
 - `url` – the HelpSpot `request.create` endpoint.
-- `category_id` – HelpSpot category (`xCategory`); `0` omits it.
+- `category` – HelpSpot category, given by name and sent as `xCategory`; leave empty to omit it.
 
 ## Test submissions
 
@@ -71,7 +71,7 @@ Each form label and spreadsheet column header has a "?" button. Its text comes f
 src/app.nim          Karax UI and submit logic (JS backend)
 src/jsbridge.nim     browser glue in Nim (file reading, attachments, POST)
 src/server.nim       mummy dev server (native backend)
-src/lib/             platform independent modules (csv, ini, validation, schema, sheet, yamlout)
+src/lib/             platform independent modules (csv, validation, schema, sheet, yamlout)
 index.html           page shell, copied to public/
 config.ini           runtime configuration
 tests/test_lib.nim   unit tests
