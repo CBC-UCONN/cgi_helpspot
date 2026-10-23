@@ -1,0 +1,5 @@
+public/
+bin/
+nimcache/
+tests/test_lib
+src/server
