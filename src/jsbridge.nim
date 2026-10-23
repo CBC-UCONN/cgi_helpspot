@@ -41,6 +41,20 @@ proc post*(url: cstring; form: Form; cb: proc (err: cstring)) =
     proc () = cb(""),
     proc (e: JsObject) = cb(errorText(e)))
 
+proc viewportWidth(): int = int(window.toJs.innerWidth.to(float))
+
+proc tooltipPosition*(anchor: Node; width: int): (int, int) =
+  ## Fixed-position left/top for a tooltip placed under `anchor`, kept inside the viewport.
+  let r = anchor.toJs.getBoundingClientRect()
+  let left = int(r.left.to(float))
+  (max(8, min(left, viewportWidth() - width - 8)), int(r.bottom.to(float)))
+
+proc addKeydownListener(cb: proc (e: JsObject)) {.importjs: "window.addEventListener('keydown', #)".}
+
+proc onEscape*(cb: proc ()) =
+  addKeydownListener(proc (e: JsObject) =
+    if e.key.to(cstring) == "Escape": cb())
+
 proc newFileReader(): JsObject {.importjs: "new FileReader()".}
 
 proc readSpreadsheet*(input: Node; cb: proc (csv, err: cstring)) =

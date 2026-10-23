@@ -1,7 +1,7 @@
 ## Single page app: DNA sequencing project form + sample spreadsheet, submitted to HelpSpot.
 {.push warning[CStringConv]: off.} # string and cstring are both JS strings on this backend
 import std/[strutils, tables, times]
-import karax/[karax, karaxdsl, vdom, kdom]
+import karax/[karax, karaxdsl, vdom, vstyles, kdom]
 import lib/[csv, ini, schema, sheet, validation, yamlout]
 import jsbridge
 
@@ -16,6 +16,7 @@ type
 const
   initialRows = 10
   maxAddRows = 1000
+  tooltipWidth = 288 # matches Tailwind w-72
   demo = defined(demo) # build with -d:demo (nimble webdemo) for the test data button
 
 proc parseConfig(text: string): Config =
@@ -38,6 +39,9 @@ var
   uploadIsError = false
   status = stIdle
   statusMsg = ""
+  activeTip = ""                 # id of the tooltip shown by hover or keyboard focus
+  tipsDismissed = false           # Escape hides tooltips until the next hover or focus
+  tipLeft, tipTop = 0
 
 proc fieldError(f: ProjectField): string =
   validate(project.getOrDefault(f.key), f.validators)
@@ -170,6 +174,37 @@ const
   okCls = inputBase & "border-slate-300 focus:ring-sky-400"
   badCls = inputBase & "border-red-500 bg-red-50 focus:ring-red-400"
 
+proc renderHelp(id, label, help: string): VNode =
+  ## WAI-ARIA tooltip pattern: a focusable trigger described by a role=tooltip element that
+  ## shows on hover or focus, stays open while hovered, and closes with Escape.
+  let tipId = "tip-" & id
+  let shown = activeTip == id and not tipsDismissed
+  let show = proc (n: VNode) =
+    activeTip = id
+    tipsDismissed = false
+    (tipLeft, tipTop) = tooltipPosition(n.dom, tooltipWidth)
+  let hide = proc () =
+    if activeTip == id: activeTip = ""
+  result = buildHtml(span(class = "inline-block align-middle",
+      onmouseenter = proc (ev: Event; n: VNode) = show(n),
+      onmouseleave = proc (ev: Event; n: VNode) = hide())):
+    button(`type` = "button",
+           class = "ml-1 inline-flex h-4 w-4 items-center justify-center rounded-full border " &
+                   "border-slate-500 text-[10px] font-bold leading-none text-slate-700 " &
+                   "hover:bg-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-500",
+           `aria-label` = "More information: " & label,
+           `aria-describedby` = tipId,
+           onfocus = proc (ev: Event; n: VNode) = show(n),
+           onblur = proc (ev: Event; n: VNode) = hide()):
+      text "?"
+    span(id = tipId, role = "tooltip",
+         class = (if shown: "fixed z-50 block pt-1 w-72" else: "hidden"),
+         style = style((StyleAttr.left, cstring($tipLeft & "px")),
+                       (StyleAttr.top, cstring($tipTop & "px")))):
+      tdiv(class = "rounded bg-slate-800 p-2 text-left text-xs font-normal normal-case " &
+                   "text-white shadow-lg"):
+        text help
+
 proc renderField(f: ProjectField): VNode =
   let key = f.key
   let val = project.getOrDefault(key)
@@ -178,10 +213,12 @@ proc renderField(f: ProjectField): VNode =
   let setVal = proc (ev: Event; n: VNode) =
     project[key] = $getInputText(n)
   result = buildHtml(tdiv(class = if f.kind == fkTextArea: "md:col-span-2" else: "")):
-    label(class = "block text-sm font-medium mb-1", `for` = "f-" & key):
-      text f.label
-      if isRequired(f.validators):
-        span(class = "text-red-600"): text " *"
+    tdiv(class = "mb-1 flex items-center"):
+      label(class = "text-sm font-medium", `for` = "f-" & key):
+        text f.label
+        if isRequired(f.validators):
+          span(class = "text-red-600"): text " *"
+      renderHelp("f-" & key, f.label, f.help)
     if f.kind == fkSelect:
       select(id = "f-" & key, class = cls, onchange = setVal):
         option(value = "", selected = (val == "")): text ""
@@ -237,6 +274,7 @@ proc renderSheet(): VNode =
                 text col.title
                 if isRequired(col.validators):
                   span(class = "text-red-600"): text " *"
+                renderHelp("c-" & col.key, col.title, col.help)
             th(class = "bg-slate-200 border border-slate-300 px-2 py-1")
         tbody:
           for r in 0 ..< grid.len:
@@ -302,4 +340,8 @@ proc createDom(): VNode =
                 oninput = proc (ev: Event; n: VNode) = addCount = $getInputText(n))
 
 resetGrid()
+onEscape(proc () =
+  if activeTip.len > 0:
+    tipsDismissed = true
+    redraw())
 setRenderer createDom, "ROOT"

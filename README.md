@@ -61,6 +61,10 @@ Column(key: "volume_ul", title: "Volume (uL)",
 
 Available validators (`src/lib/validation.nim`): `required`, `minLength`, `maxLength`, `allowedChars`, `oneOf`, `numberRange`, `email`, `uniqueInColumn`. A validator is just a `proc (value: string; ctx: ValidationContext): string` returning an error message or `""`, so custom ones are easy to add. Invalid cells are highlighted (hover for the message) and submission is blocked until everything is valid.
 
+## Help tooltips
+
+Each form label and spreadsheet column header has a "?" button. Its text comes from the `help` field of the entry in `src/lib/schema.nim`. The tooltip follows the WAI-ARIA Authoring Practices tooltip pattern: the button is keyboard focusable and points to a `role="tooltip"` element through `aria-describedby`; the tooltip opens on hover or focus, stays open while the pointer is over it, and closes with Escape.
+
 ## Layout
 
 ```

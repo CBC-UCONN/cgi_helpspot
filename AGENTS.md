@@ -28,6 +28,7 @@ Server needs `--threads:on` (already in the task). `public/` and `bin/` are gene
 ## Conventions and constraints
 
 - Do not use `import std/prelude`; import specific modules.
+- Every `ProjectField` and `Column` needs a `help` string; it feeds the ARIA tooltip rendered by `renderHelp` in `src/app.nim` (trigger button + `aria-describedby` + `role="tooltip"`, Escape to close). Keep that pattern when changing it.
 - Add or change validation only through the validator lists in `src/lib/schema.nim`. New validators go in `validation.nim`: empty values must pass (only `required` rejects empty) and the return is an error string or `""`.
 - HelpSpot has no CORS. The POST uses `mode: "no-cors"`; only network errors can be detected. Do not add code that reads the response.
 - Karax notes: handler signature `proc (ev: Event; n: VNode)`; read input text with `getInputText(n)`; call `redraw()` in async callbacks; import `karax/kdom` (with the `karax/` prefix) for DOM types.
