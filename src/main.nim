@@ -1,7 +1,7 @@
 import std/[jsffi, strutils]
 import karax/[karaxdsl, vdom, kbase]
 import karax/karax
-import model, update, validators, csvio
+import model, update, csvio
 
 proc readFileInput(id: cstring; callback: proc(content: cstring) {.closure.}) {.importjs: """
   (function(id, callback) {
@@ -29,6 +29,28 @@ proc downloadText(filename, content: cstring) {.importjs: """
 
 proc checkboxChecked(id: cstring): bool {.importjs: "document.getElementById(#).checked".}
 
+proc syncFieldFeedback(id, message: cstring) {.importjs: """
+  (function(id, message) {
+    const input = document.getElementById(id);
+    const error = document.getElementById(id + '-error');
+    if (!input || !error) return;
+    if (error.firstChild) error.firstChild.nodeValue = message;
+    input.setAttribute('aria-invalid', message ? 'true' : 'false');
+    if (id.startsWith('sample[')) {
+      input.classList.toggle('text-red-700', !!message);
+      input.classList.toggle('ring-1', !!message);
+      input.classList.toggle('ring-inset', !!message);
+      input.classList.toggle('ring-red-400', !!message);
+      input.classList.toggle('focus:ring-1', !message);
+      input.classList.toggle('focus:ring-inset', !message);
+      input.classList.toggle('focus:ring-blue-500', !message);
+    } else {
+      input.classList.toggle('border-red-400', !!message);
+      input.classList.toggle('border-slate-300', !message);
+    }
+  })(#, #)
+""".}
+
 var state = initialModel()
 
 proc dispatch(msg: Msg) =
@@ -51,58 +73,61 @@ proc labelText(label, field: string): VNode =
 
 proc errorText(field: string): VNode =
   let message = fieldError(field)
-  buildHtml(tdiv(class = "mt-1 text-xs text-red-600")):
-    if message.len > 0: text message
-
-proc projectValue(project: ProjectForm; key: string): string =
-  case key
-  of "projectName": project.projectName
-  of "requester": project.requester
-  of "email": project.email
-  of "organism": project.organism
-  of "assay": $project.assay
-  of "readType": $project.readType
-  of "indexType": $project.indexType
-  of "libraryPrep": project.libraryPrep
-  of "customReference": $project.customReference
-  of "referenceName": project.referenceName
-  of "notes": project.notes
-  else: ""
-
-proc projectBoolValue(project: ProjectForm; key: string): bool =
-  key == "customReference" and project.customReference
+  buildHtml(tdiv(id = field & "-error", class = "mt-1 text-xs text-red-600", `aria-live` = "polite")):
+    text message
 
 proc projectFieldView(fieldDef: ProjectFieldDef): VNode =
   let key = fieldDef.key
-  let value = projectValue(state.project, key)
+  let value = state.project.field(key)
   case fieldDef.kind
   of textField, emailField:
     buildHtml(tdiv(class = "space-y-1")):
       labelText(fieldDef.label, key)
-      input(id = key, class = inputClass(key), value = value, `type` = (if fieldDef.kind == emailField: "email" else: "text")):
-        proc oninput(ev: Event; n: VNode) =
+      input(id = key, class = inputClass(key), value = value, `aria-invalid` = (if hasError(key): "true" else: "false"), `aria-describedby` = key & "-error", `type` = (if fieldDef.kind == emailField: "email" else: "text")):
+        proc oninput(ev: Event; n: VNode) {.noredraw.} =
           dispatch(Msg(kind: setProjectField, column: key, value: $n.value))
+          syncFieldFeedback(cstring(key), cstring(fieldError(key)))
+        proc onblur(ev: Event; n: VNode) =
+          dispatch(Msg(kind: blurProjectField, column: key))
       if fieldDef.help.len > 0:
         p(class = "text-xs text-slate-500"): text fieldDef.help
       errorText(key)
   of selectField:
     buildHtml(tdiv(class = "space-y-1")):
       labelText(fieldDef.label, key)
-      select(id = key, class = inputClass(key), value = value):
+      select(id = key, class = inputClass(key), value = value, `aria-invalid` = (if hasError(key): "true" else: "false"), `aria-describedby` = key & "-error"):
         proc onchange(ev: Event; n: VNode) =
           dispatch(Msg(kind: setProjectField, column: key, value: $n.value))
+        proc onblur(ev: Event; n: VNode) =
+          dispatch(Msg(kind: blurProjectField, column: key))
         for optionValue in fieldDef.options:
           option(value = optionValue, selected = optionValue == value):
             text optionValue
       if fieldDef.help.len > 0:
         p(class = "text-xs text-slate-500"): text fieldDef.help
       errorText(key)
+  of choiceField:
+    buildHtml(fieldset(class = "space-y-2", `aria-describedby` = key & "-error")):
+      legend(class = "block text-sm font-medium text-slate-700"): text fieldDef.label
+      for optionValue in fieldDef.options:
+        label(class = "flex items-start gap-2 text-sm text-slate-700"):
+          input(`type` = "radio", name = key, value = optionValue, checked = optionValue == value, class = "mt-1", `aria-invalid` = (if hasError(key): "true" else: "false"), `aria-describedby` = key & "-error"):
+            proc onchange(ev: Event; n: VNode) =
+              dispatch(Msg(kind: setProjectField, column: key, value: $n.value))
+            proc onblur(ev: Event; n: VNode) =
+              dispatch(Msg(kind: blurProjectField, column: key))
+          span: text optionValue
+      if fieldDef.help.len > 0:
+        p(class = "text-xs text-slate-500"): text fieldDef.help
+      errorText(key)
   of checkboxField:
     buildHtml(tdiv(class = "rounded-xl border border-slate-200 bg-slate-50 p-4")):
       label(class = "flex cursor-pointer items-start gap-3"):
-        input(id = key, `type` = "checkbox", class = "mt-1 h-4 w-4 rounded border-slate-300", checked = projectBoolValue(state.project, key)):
+        input(id = key, `type` = "checkbox", class = "mt-1 h-4 w-4 rounded border-slate-300", checked = value == "true", `aria-invalid` = (if hasError(key): "true" else: "false"), `aria-describedby` = key & "-error"):
           proc onchange(ev: Event; n: VNode) =
             dispatch(Msg(kind: setProjectField, column: key, boolValue: checkboxChecked(key)))
+          proc onblur(ev: Event; n: VNode) =
+            dispatch(Msg(kind: blurProjectField, column: key))
         span:
           span(class = "block text-sm font-medium text-slate-800"): text fieldDef.label
           if fieldDef.help.len > 0:
@@ -111,9 +136,12 @@ proc projectFieldView(fieldDef: ProjectFieldDef): VNode =
   of textareaField:
     buildHtml(tdiv(class = "space-y-1")):
       labelText(fieldDef.label, key)
-      textarea(id = key, class = inputClass(key), rows = "4", value = value):
-        proc oninput(ev: Event; n: VNode) =
+      textarea(id = key, class = inputClass(key), rows = "4", value = value, `aria-invalid` = (if hasError(key): "true" else: "false"), `aria-describedby` = key & "-error"):
+        proc oninput(ev: Event; n: VNode) {.noredraw.} =
           dispatch(Msg(kind: setProjectField, column: key, value: $n.value))
+          syncFieldFeedback(cstring(key), cstring(fieldError(key)))
+        proc onblur(ev: Event; n: VNode) =
+          dispatch(Msg(kind: blurProjectField, column: key))
       if fieldDef.help.len > 0:
         p(class = "text-xs text-slate-500"): text fieldDef.help
       errorText(key)
@@ -128,12 +156,21 @@ proc projectSection(): VNode =
         projectFieldView(fieldDef)
 
 proc sampleCell(rowIndex: int; column: SampleColumnDef; value: string): VNode =
-  buildHtml(td(class = "border-b border-slate-200 p-2 align-top")):
-    input(class = "min-w-32 w-full rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-100", value = value):
-      proc oninput(ev: Event; n: VNode) = dispatch(Msg(kind: setSampleCell, row: rowIndex, column: column.key, value: $n.value))
-    let key = "sample[" & $(rowIndex + 1) & "]." & column.key
-    if hasError(key):
-      p(class = "mt-1 text-xs text-red-600"): text fieldError(key)
+  let key = "sample[" & $(rowIndex + 1) & "]." & column.key
+  buildHtml(td(class = column.widthClass & " border border-slate-300 p-0 align-top")):
+    input(id = key, size = "1", class = (if hasError(key): "block w-full min-w-0 border-0 bg-white px-2 py-1.5 text-sm text-red-700 outline-none ring-1 ring-inset ring-red-400" else: "block w-full min-w-0 border-0 bg-white px-2 py-1.5 text-sm outline-none focus:ring-1 focus:ring-inset focus:ring-blue-500"), value = value, `aria-label` = column.label & ", row " & $(rowIndex + 1), `aria-invalid` = (if hasError(key): "true" else: "false"), `aria-describedby` = key & "-error"):
+      proc oninput(ev: Event; n: VNode) {.noredraw.} =
+        dispatch(Msg(kind: setSampleCell, row: rowIndex, column: column.key, value: $n.value))
+        for index in 0 ..< state.samples.len:
+          let cellKey = "sample[" & $(index + 1) & "]." & column.key
+          syncFieldFeedback(cstring(cellKey), cstring(fieldError(cellKey)))
+      proc onblur(ev: Event; n: VNode) = dispatch(Msg(kind: blurSampleCell, row: rowIndex, column: column.key))
+    errorText(key)
+
+proc removeSampleButton(rowIndex: int): VNode =
+  buildHtml(button(class = "h-8 w-8 text-sm font-bold text-red-600 hover:bg-red-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-red-600", `type` = "button", `aria-label` = "Remove row " & $(rowIndex + 1), title = "Remove row")):
+    text "X"
+    proc onclick = dispatch(Msg(kind: removeSample, row: rowIndex))
 
 proc sampleTable(): VNode =
   let columns = visibleSampleColumns(state.project)
@@ -153,55 +190,43 @@ proc sampleTable(): VNode =
     if state.csvMessage.len > 0:
       tdiv(class = "mx-6 mt-4 rounded-lg bg-blue-50 px-4 py-3 text-sm text-blue-800"): text state.csvMessage
     tdiv(class = "overflow-x-auto"):
-      table(class = "min-w-full border-collapse"):
+      table(class = "w-max table-auto border-collapse"):
         thead(class = "bg-slate-50"):
           tr:
-            th(class = "sticky left-0 border-b border-slate-200 px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500"): text "#"
+            th(class = "w-9 border border-slate-300 px-1 py-2 text-center text-xs font-medium text-slate-500"): text "#"
             for column in columns:
-              th(class = "border-b border-slate-200 px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500"): text column.label
-            th(class = "border-b border-slate-200 px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500"): text ""
-        tbody:
+              th(class = column.widthClass & " border border-slate-300 px-2 py-2 text-left text-xs font-semibold text-slate-600"): text column.label
+            th(class = "w-8 border border-slate-300 p-0"): text ""
+        tbody(index = state.sampleRevision):
           for i, row in state.samples:
             tr:
-              td(class = "border-b border-slate-200 px-3 py-2 text-sm font-medium text-slate-500"): text $(i + 1)
+              td(class = "w-9 border border-slate-300 px-1 py-1 text-center align-top text-xs text-slate-500"): text $(i + 1)
               for column in columns:
                 sampleCell(i, column, field(row, column.key))
-              td(class = "border-b border-slate-200 px-3 py-2"):
-                button(class = "rounded-md px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50", `type` = "button", disabled = state.samples.len <= 1):
-                  text "Remove"
-                  proc onclick = dispatch(Msg(kind: removeSample, row: i))
+              td(class = "w-8 border border-slate-300 p-0 align-top"):
+                removeSampleButton(i)
     tdiv(class = "flex flex-col gap-3 border-t border-slate-200 p-6 sm:flex-row sm:items-center sm:justify-between"):
       button(class = "rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800", `type` = "button"):
         text "+ Add sample"
         proc onclick = dispatch(Msg(kind: addSample))
       p(class = "text-xs text-slate-500"): text "Tip: download a template after changing the project settings so its columns stay synchronized."
 
-proc summaryView(): VNode =
-  let errorCount = state.errors.len
-  buildHtml(tdiv(class = "rounded-2xl border border-slate-200 bg-white p-6 shadow-sm")):
-    h2(class = "text-lg font-semibold text-slate-900"): text "Review & submit"
-    tdiv(class = "mt-4 grid gap-3 text-sm sm:grid-cols-3"):
-      tdiv(class = "rounded-lg bg-slate-50 p-3"): text "Samples: " & $state.samples.len
-      tdiv(class = "rounded-lg bg-slate-50 p-3"): text "Validation errors: " & $errorCount
-      tdiv(class = "rounded-lg bg-slate-50 p-3"): text "Read: " & $state.project.readType
-    if state.submissionMessage.len > 0:
-      tdiv(class = (if state.errors.len > 0: "mt-4 rounded-lg bg-red-50 p-4 text-sm text-red-800" else: "mt-4 rounded-lg bg-emerald-50 p-4 text-sm text-emerald-800")):
-        text state.submissionMessage
-    tdiv(class = "mt-5 flex justify-end"):
-      button(class = "rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50", `type` = "button"):
-        text "Validate & submit request"
-        proc onclick = dispatch(Msg(kind: submit))
-
 proc app(): VNode =
   buildHtml(tdiv(class = "min-h-screen")):
     header(class = "border-b border-slate-200 bg-white"):
-      tdiv(class = "mx-auto max-w-7xl px-6 py-5"):
-        p(class = "text-sm font-semibold uppercase tracking-wider text-blue-600"): text "Sequencing Core"
-        h1(class = "mt-1 text-2xl font-bold tracking-tight text-slate-900"): text "DNA sequencing request"
-        p(class = "mt-1 max-w-2xl text-sm text-slate-500"): text "Describe the project, enter samples, validate everything in your browser, and submit the request."
-    main(class = "mx-auto max-w-7xl space-y-6 px-6 py-8"):
-      projectSection()
+      tdiv(class = "mx-auto flex max-w-7xl flex-wrap items-start justify-between gap-4 px-6 py-5"):
+        tdiv:
+          p(class = "text-sm font-semibold uppercase tracking-wider text-blue-600"): text "UConn Center for Genome Innovation"
+          h1(class = "mt-1 text-2xl font-bold tracking-tight text-slate-900"): text "Sequencing Request Form"
+          p(class = "mt-1 max-w-2xl text-sm text-slate-500"): text "Enter project and sample details below."
+        button(class = "rounded-md bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800", `type` = "button"):
+          text "Submit request"
+          proc onclick = dispatch(Msg(kind: submitRequest))
+    main(class = "space-y-6 px-6 py-8"):
+      tdiv(class = "mx-auto max-w-7xl space-y-6"):
+        if state.submissionMessage.len > 0:
+          p(class = "text-sm font-medium text-slate-800", role = "status"): text state.submissionMessage
+        projectSection()
       sampleTable()
-      summaryView()
 
 setRenderer app, "app"

@@ -1,49 +1,14 @@
+import std/[tables, sets]
+import validators
+
 type
-  AssayKind* = enum
-    assayBulk = "Bulk DNA"
-    assayAmplicon = "Amplicon"
-    assaySingleCell = "Single-cell DNA"
-    assayMetagenomic = "Metagenomic"
-
-  ReadKind* = enum
-    singleEnd = "Single-end"
-    pairedEnd = "Paired-end"
-
-  IndexKind* = enum
-    noIndex = "No index"
-    dualIndex = "Dual index (i7 + i5)"
-    singleIndex = "Single index (i7)"
-
-  ProjectForm* = object
-    projectName*: string
-    requester*: string
-    email*: string
-    organism*: string
-    assay*: AssayKind
-    readType*: ReadKind
-    indexType*: IndexKind
-    libraryPrep*: string
-    customReference*: bool
-    referenceName*: string
-    notes*: string
-
-  SampleRow* = object
-    sampleId*: string
-    sampleName*: string
-    source*: string
-    strain*: string
-    cellType*: string
-    libraryPrep*: string
-    i7Index*: string
-    i5Index*: string
-    reference*: string
+  ProjectForm* = Table[string, string]
+  SampleRow* = Table[string, string]
 
   ValidationError* = object
     field*: string
     message*: string
 
-  # A schema predicate is deliberately kept independent of the view. This
-  # lets field/column visibility be declared next to the schema definition.
   ProjectCondition* = proc(project: ProjectForm): bool
 
   ProjectFieldKind* = enum
@@ -52,6 +17,7 @@ type
     selectField
     checkboxField
     textareaField
+    choiceField
 
   ProjectFieldDef* = object
     key*: string
@@ -59,12 +25,21 @@ type
     kind*: ProjectFieldKind
     options*: seq[string]
     help*: string
+    placeholder*: string
+    fullWidth*: bool
+    defaultValue*: string
     visibleIf*: ProjectCondition
+    validators*: seq[Validator]
 
   SampleColumnDef* = object
     key*: string
     label*: string
+    help*: string
+    widthClass*: string
+    options*: seq[string]
+    uniqueMessage*: string
     visibleIf*: ProjectCondition
+    validators*: seq[Validator]
 
   AppSchema* = object
     projectFields*: seq[ProjectFieldDef]
@@ -73,110 +48,199 @@ type
   AppModel* = object
     project*: ProjectForm
     samples*: seq[SampleRow]
+    sampleRevision*: int
     errors*: seq[ValidationError]
+    editedFields*: HashSet[string]
+    liveFields*: HashSet[string]
     csvMessage*: string
-    submitted*: bool
     submissionMessage*: string
 
 proc alwaysVisible*(project: ProjectForm): bool = true
 
-proc assayIs*(assay: AssayKind): ProjectCondition =
-  result = proc(project: ProjectForm): bool = project.assay == assay
+proc field*(values: Table[string, string]; key: string): string =
+  values.getOrDefault(key)
 
-proc assayIsNot*(assay: AssayKind): ProjectCondition =
-  result = proc(project: ProjectForm): bool = project.assay != assay
+const
+  identifierChars = {'a'..'z', 'A'..'Z', '0'..'9', '_', '-', '.'}
+  barcodeChars = {'A', 'C', 'G', 'T', 'N', 'a', 'c', 'g', 't', 'n', '-', '+'}
 
-proc indexIs*(indexType: IndexKind): ProjectCondition =
-  result = proc(project: ProjectForm): bool = project.indexType == indexType
-
-proc indexIsNot*(indexType: IndexKind): ProjectCondition =
-  result = proc(project: ProjectForm): bool = project.indexType != indexType
-
-proc customReferenceEnabled*(project: ProjectForm): bool = project.customReference
-
-proc projectSchema*(): seq[ProjectFieldDef] =
-  ## The project form is defined here. To add a field, add its model member
-  ## and one schema entry rather than changing the view layout.
-  @[
-    ProjectFieldDef(key: "projectName", label: "Project name", kind: textField, visibleIf: alwaysVisible),
-    ProjectFieldDef(key: "requester", label: "Requester", kind: textField, visibleIf: alwaysVisible),
-    ProjectFieldDef(key: "email", label: "Email", kind: emailField, visibleIf: alwaysVisible),
-    ProjectFieldDef(key: "organism", label: "Organism", kind: textField, visibleIf: alwaysVisible),
-    ProjectFieldDef(
-      key: "assay", label: "Assay", kind: selectField,
-      options: @[$assayBulk, $assayAmplicon, $assaySingleCell, $assayMetagenomic],
-      visibleIf: alwaysVisible
-    ),
-    ProjectFieldDef(
-      key: "readType", label: "Read type", kind: selectField,
-      options: @[$singleEnd, $pairedEnd], visibleIf: alwaysVisible
-    ),
-    ProjectFieldDef(
-      key: "indexType", label: "Indexing", kind: selectField,
-      options: @[$noIndex, $singleIndex, $dualIndex], visibleIf: alwaysVisible
-    ),
-    ProjectFieldDef(key: "libraryPrep", label: "Library preparation", kind: textField, visibleIf: alwaysVisible),
-    ProjectFieldDef(
-      key: "customReference", label: "Use a custom reference", kind: checkboxField,
-      help: "Adds reference fields to the sample table.", visibleIf: alwaysVisible
-    ),
-    ProjectFieldDef(
-      key: "referenceName", label: "Reference name", kind: textField,
-      visibleIf: customReferenceEnabled
-    ),
-    ProjectFieldDef(key: "notes", label: "Project notes", kind: textareaField, visibleIf: alwaysVisible)
+let
+  institutionOptions = @[
+    "UConn (Storrs, Avery Point, or other)", "UConn Health", "JAX-GM", "Other"
   ]
-
-proc sampleColumnSchema*(): seq[SampleColumnDef] =
-  ## Sample-table columns and their display conditions live in one schema.
-  ## The same schema is used by the view and CSV code.
-  @[
-    SampleColumnDef(key: "sample_id", label: "Sample ID", visibleIf: alwaysVisible),
-    SampleColumnDef(key: "sample_name", label: "Sample name", visibleIf: alwaysVisible),
-    SampleColumnDef(key: "source", label: "Source", visibleIf: alwaysVisible),
-    SampleColumnDef(
-      key: "strain", label: "Strain",
-      visibleIf: proc(project: ProjectForm): bool = project.assay in {assayBulk, assayAmplicon, assayMetagenomic}
-    ),
-    SampleColumnDef(
-      key: "cell_type", label: "Cell type",
-      visibleIf: assayIs(assaySingleCell)
-    ),
-    SampleColumnDef(key: "library_prep", label: "Library prep", visibleIf: alwaysVisible),
-    SampleColumnDef(
-      key: "i7_index", label: "i7 index",
-      visibleIf: proc(project: ProjectForm): bool = project.indexType in {singleIndex, dualIndex}
-    ),
-    SampleColumnDef(
-      key: "i5_index", label: "i5 index",
-      visibleIf: indexIs(dualIndex)
-    ),
-    SampleColumnDef(
-      key: "reference", label: "Reference",
-      visibleIf: customReferenceEnabled
-    )
+  membershipOptions = @["Yes", "No"]
+  serviceOptions = @[
+    "Complete NGS workflow (sample QC through NGS sequencing)",
+    "Next Generation Sequencing (NGS) Library Preparation only",
+    "Customer prepared library QC and CGI sequencing",
+    "Digital Droplet PCR (Designed Probe Assays)",
+    "Digital Droplet PCR (Evagreen assays)",
+    "PacBio Sequel IIe/Revio library prep and sequencing",
+    "PacBio Sequel IIe/Revio - RUN ONLY",
+    "ONT MinION/PromethION library prep and sequencing",
+    "ONT MinION/Promethion - RUN ONLY"
   ]
+  irbOptions = @[
+    "I certify that the samples I am submitting fall under an active/approved IRB protocol and all sample names have been de-identified",
+    "An active/approved IRB protocol is not needed for these samples"
+  ]
+  sampleTypeOptions = @["gDNA", "DNA", "RNA", "cDNA", "Library", "Amplicon", "Other"]
+
+let projectSchema* = @[
+  # Contact name
+  ProjectFieldDef(
+    key: "contact_name", label: "Contact name", kind: textField,
+    placeholder: "Full name", validators: @[required("Contact name"), maxLength(120)]
+  ),
+  # Contact email
+  ProjectFieldDef(
+    key: "contact_email", label: "Contact email", kind: emailField,
+    placeholder: "name@example.com", validators: @[required("Contact email"), validEmail()]
+  ),
+  # Principal investigator
+  ProjectFieldDef(
+    key: "principal_investigator", label: "Principal investigator", kind: textField,
+    placeholder: "Principal investigator name",
+    validators: @[required("Principal investigator"), maxLength(120)]
+  ),
+  # Contact PI
+  ProjectFieldDef(
+    key: "contact_pi", label: "Contact PI", kind: textField,
+    placeholder: "Contact PI name", validators: @[required("Contact PI"), maxLength(120)]
+  ),
+  # Institution
+  ProjectFieldDef(
+    key: "institution", label: "Institution", kind: selectField,
+    options: institutionOptions, validators: @[oneOf(institutionOptions)]
+  ),
+  # ISG member
+  ProjectFieldDef(
+    key: "is_isg_member", label: "ISG member", kind: choiceField,
+    options: membershipOptions, validators: @[oneOf(membershipOptions)]
+  ),
+  # Service requested
+  ProjectFieldDef(
+    key: "service_requested", label: "Service requested", kind: selectField,
+    options: serviceOptions, fullWidth: true, validators: @[oneOf(serviceOptions)]
+  ),
+  # Read length
+  ProjectFieldDef(
+    key: "read_length", label: "Read length", kind: textField,
+    help: "Optional read length in bases.", placeholder: "Bases",
+    validators: @[numberRange(1, 1000000, integer = true)]
+  ),
+  # PO number
+  ProjectFieldDef(
+    key: "po_number", label: "PO number", kind: textField,
+    placeholder: "Purchase order number", validators: @[maxLength(60)]
+  ),
+  # Description
+  ProjectFieldDef(
+    key: "description", label: "Description", kind: textareaField,
+    help: "Describe the project and any relevant requirements.", fullWidth: true,
+    validators: @[maxLength(4000)]
+  ),
+  # IRB certification
+  ProjectFieldDef(
+    key: "irb_certification", label: "IRB certification", kind: choiceField,
+    options: irbOptions, fullWidth: true,
+    validators: @[required("IRB certification"), oneOf(irbOptions)]
+  )
+]
+
+let sampleColumnSchema* = @[
+  # Sample ID
+  SampleColumnDef(
+    key: "sample_id", label: "Sample ID", widthClass: "min-w-40",
+    help: "Unique ID using letters, numbers, underscores, hyphens, or periods.",
+    uniqueMessage: "Sample ID must be unique.",
+    validators: @[required("Sample ID"), maxLength(50), allowedChars(identifierChars, "letters, numbers, underscores, hyphens, and periods")]
+  ),
+  # Tube ID
+  SampleColumnDef(
+    key: "tube_id", label: "Tube ID", widthClass: "min-w-28",
+    help: "Up to 6 letters, numbers, underscores, hyphens, or periods.",
+    validators: @[required("Tube ID"), maxLength(6), allowedChars(identifierChars, "letters, numbers, underscores, hyphens, and periods")]
+  ),
+  # Organism
+  SampleColumnDef(
+    key: "organism", label: "Organism", widthClass: "min-w-40",
+    validators: @[required("Organism"), maxLength(120)]
+  ),
+  # Sample type
+  SampleColumnDef(
+    key: "sample_type", label: "Sample type", widthClass: "min-w-36",
+    options: sampleTypeOptions, validators: @[required("Sample type"), oneOf(sampleTypeOptions)]
+  ),
+  # Concentration (ng/uL)
+  SampleColumnDef(
+    key: "concentration_ng_ul", label: "Concentration (ng/uL)", widthClass: "min-w-40",
+    validators: @[required("Concentration"), numberRange(0, 100000)]
+  ),
+  # Volume (uL)
+  SampleColumnDef(
+    key: "volume_ul", label: "Volume (uL)", widthClass: "min-w-32",
+    validators: @[required("Volume"), numberRange(0, 100000)]
+  ),
+  # Read depth
+  SampleColumnDef(
+    key: "read_depth", label: "Read depth", widthClass: "min-w-32",
+    validators: @[required("Read depth"), numberRange(0, 1000000)]
+  ),
+  # Notes
+  SampleColumnDef(
+    key: "notes", label: "Notes", widthClass: "min-w-48", validators: @[maxLength(500)]
+  ),
+  # Library ID
+  SampleColumnDef(
+    key: "library_id", label: "Library ID", widthClass: "min-w-40",
+    help: "Unique ID using letters, numbers, underscores, hyphens, or periods.",
+    uniqueMessage: "Library ID must be unique.",
+    validators: @[required("Library ID"), maxLength(50), allowedChars(identifierChars, "letters, numbers, underscores, hyphens, and periods")]
+  ),
+  # Library name
+  SampleColumnDef(
+    key: "library_name", label: "Library name", widthClass: "min-w-40",
+    validators: @[maxLength(100)]
+  ),
+  # Library type
+  SampleColumnDef(
+    key: "library_type", label: "Library type", widthClass: "min-w-40",
+    validators: @[maxLength(100)]
+  ),
+  # Index barcode
+  SampleColumnDef(
+    key: "index_barcode", label: "Index barcode", widthClass: "min-w-40",
+    help: "Use A, C, G, T, N, hyphens, or plus signs.",
+    validators: @[maxLength(40), allowedChars(barcodeChars, "A, C, G, T, N, hyphens, and plus signs")]
+  )
+]
+
+proc setSampleValue*(row: var SampleRow; key, value: string) =
+  for column in sampleColumnSchema:
+    if column.key == key:
+      row[key] = value
+      return
 
 proc visibleProjectFields*(project: ProjectForm): seq[ProjectFieldDef] =
-  for field in projectSchema():
-    if field.visibleIf(project):
-      result.add field
+  for fieldDef in projectSchema:
+    if fieldDef.visibleIf == nil or fieldDef.visibleIf(project):
+      result.add fieldDef
 
 proc visibleSampleColumns*(project: ProjectForm): seq[SampleColumnDef] =
-  for column in sampleColumnSchema():
-    if column.visibleIf(project):
+  for column in sampleColumnSchema:
+    if column.visibleIf == nil or column.visibleIf(project):
       result.add column
 
 proc emptySample*(): SampleRow =
-  SampleRow()
+  result = initTable[string, string]()
+  for column in sampleColumnSchema:
+    result[column.key] = ""
 
 proc defaultProject*(): ProjectForm =
-  ProjectForm(
-    assay: assayBulk,
-    readType: pairedEnd,
-    indexType: dualIndex,
-    customReference: false
-  )
+  result = initTable[string, string]()
+  for fieldDef in projectSchema:
+    result[fieldDef.key] = fieldDef.defaultValue
 
 proc initialModel*(): AppModel =
   AppModel(project: defaultProject(), samples: @[emptySample()])

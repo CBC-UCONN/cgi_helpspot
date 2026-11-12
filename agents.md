@@ -12,6 +12,7 @@ All application source belongs in `/src`.
 - `src/update.nim`: messages and state transitions.
 - `src/main.nim`: Karax rendering and browser event wiring.
 - `src/validators.nim`: reusable validation functions.
+- `src/validation.nim`: schema-driven and cross-row validation.
 - `src/csvio.nim`: CSV parsing/export and schema-derived column handling.
 
 Do not use `import karax/prelude`. Import the specific Karax modules needed by the code.
@@ -31,24 +32,27 @@ The project form and sample-table columns are schema-driven.
 
 ### Project fields
 
-Define project fields in `projectSchema()` in `src/model.nim` using `ProjectFieldDef`:
+Define project fields in `projectSchema` in `src/model.nim` using `ProjectFieldDef`:
 
 - `key`: model field key.
 - `label`: user-facing label.
 - `kind`: `textField`, `emailField`, `selectField`, `checkboxField`, or `textareaField`.
 - `options`: select choices when applicable.
 - `help`: optional explanatory text.
+- `defaultValue`: initial string value.
 - `visibleIf`: a `ProjectCondition` predicate.
+- `validators`: reusable field validators.
 
 The view renders `visibleProjectFields(project)`. Do not add independent visibility checks to the view when a rule belongs in the schema.
 
 ### Sample columns
 
-Define columns in `sampleColumnSchema()` using `SampleColumnDef`:
+Define columns in `sampleColumnSchema` using `SampleColumnDef`:
 
 - `key`: stable CSV/model key.
 - `label`: displayed table heading.
 - `visibleIf`: a `ProjectCondition` predicate.
+- `validators`: reusable column validators.
 
 The table and CSV code both derive their columns from `visibleSampleColumns(project)`. Never maintain a second hard-coded list of conditional columns.
 
@@ -58,18 +62,16 @@ Simple reusable predicates include `alwaysVisible`, `assayIs(...)`, `assayIsNot(
 
 When adding a project field:
 
-1. Add the typed member to `ProjectForm`.
-2. Add a `ProjectFieldDef` to `projectSchema()`.
-3. Extend `projectValue()` / `setProjectValue()` if needed by the new field type.
-4. Add validation in `validators.nim` if appropriate.
-5. Add a matching update behavior only if the generic `setProjectField` path cannot represent the field.
+1. Add a `ProjectFieldDef` to `projectSchema` with a unique key and any default, visibility predicate, and validators.
+2. Add reusable validators in `validators.nim` if needed.
+3. Add update behavior only if the generic `setProjectField` path cannot represent the field.
 
 When adding a sample column:
 
-1. Add the member to `SampleRow`.
-2. Add one `SampleColumnDef` to `sampleColumnSchema()`.
-3. Add its storage mapping to `field()` and `setSampleValue()`.
-4. Add validation if required.
+1. Add one `SampleColumnDef` to `sampleColumnSchema` with a unique key and any visibility predicate and validators.
+2. Add reusable validators in `validators.nim` if needed.
+
+`ProjectForm` and `SampleRow` are string tables keyed by schema keys; they do not need per-field members or storage mappings.
 
 Do not add conditional rendering directly to `sampleTable()` unless the condition is purely presentational. Data-dependent visibility belongs in the schema.
 
@@ -80,7 +82,7 @@ The current visible sample-column schema determines the CSV header. A CSV upload
 ## Build
 
 ```bash
-nimble build
+nimble buildWeb
 ```
 
 The build writes the browser application to `/public`.

@@ -11,19 +11,6 @@ proc csvEscape*(value: string): string =
   else:
     value
 
-proc field*(row: SampleRow; name: string): string =
-  case name
-  of "sample_id": row.sampleId
-  of "sample_name": row.sampleName
-  of "source": row.source
-  of "strain": row.strain
-  of "cell_type": row.cellType
-  of "library_prep": row.libraryPrep
-  of "i7_index": row.i7Index
-  of "i5_index": row.i5Index
-  of "reference": row.reference
-  else: ""
-
 proc templateCsv*(p: ProjectForm): string =
   let columns = visibleSampleColumns(p)
   result = columns.mapIt(it.key).join(",") & "\n"
@@ -70,17 +57,7 @@ proc parseCsv*(contents: string; p: ProjectForm): tuple[rows: seq[SampleRow], er
     var row = emptySample()
     for i, name in expected:
       let value = values[i].strip()
-      case name
-      of "sample_id": row.sampleId = value
-      of "sample_name": row.sampleName = value
-      of "source": row.source = value
-      of "strain": row.strain = value
-      of "cell_type": row.cellType = value
-      of "library_prep": row.libraryPrep = value
-      of "i7_index": row.i7Index = value
-      of "i5_index": row.i5Index = value
-      of "reference": row.reference = value
-      else: discard
+      setSampleValue(row, name, value)
     result.rows.add row
 
   if result.rows.len == 0 and result.errors.len == 0:
