@@ -1,0 +1,4 @@
+public/
+build/
+nimcache/
+*.js.map
