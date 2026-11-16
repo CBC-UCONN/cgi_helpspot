@@ -157,6 +157,27 @@ proc startFillDrag(event: Event; callback: proc(targetRow: int) {.closure.}; pre
   })(#, #, #)
 """.}
 
+proc startColumnResize(event: Event) {.importjs: """
+  (function(event) {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    const th = event.currentTarget.closest('th');
+    const startX = event.clientX;
+    const startWidth = th.getBoundingClientRect().width;
+    function move(e) {
+      const width = Math.max(48, startWidth + e.clientX - startX) + 'px';
+      th.style.width = width;
+      th.style.minWidth = width;
+    }
+    function finish() {
+      document.removeEventListener('mousemove', move);
+      document.removeEventListener('mouseup', finish);
+    }
+    document.addEventListener('mousemove', move);
+    document.addEventListener('mouseup', finish);
+  })(#)
+""".}
+
 proc syncFieldFeedback(id, message: cstring) {.importjs: """
   (function(id, message) {
     const input = document.getElementById(id);
@@ -394,7 +415,10 @@ proc sampleTable(): VNode =
               tr:
                 th(class = "w-9 border border-slate-300 px-1 py-2 text-center text-xs font-medium text-slate-500"): text "#"
                 for column in columns:
-                  th(class = column.widthClass & " border border-slate-300 px-2 py-2 text-left text-xs font-semibold text-slate-600"):
+                  th(class = column.widthClass & " relative border border-slate-300 px-2 py-2 text-left text-xs font-semibold text-slate-600"):
+                    tdiv(class = "absolute right-0 top-0 z-20 h-full w-1.5 cursor-col-resize hover:bg-blue-400", role = "separator", `aria-orientation` = "vertical"):
+                      proc onmousedown(ev: Event; n: VNode) {.noredraw.} =
+                        startColumnResize(ev)
                     tdiv(class = "flex items-center gap-1 whitespace-normal break-words"):
                       text column.label
                       if column.help.len > 0:
