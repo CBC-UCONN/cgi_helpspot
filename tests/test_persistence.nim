@@ -35,11 +35,17 @@ suite "model persistence":
   test "reset restores defaults and replaces the sample table":
     var state = initialModel()
     state.project["contact_name"] = "Test user"
+    update(state, Msg(kind: setProjectField, column: "instrument", value: "PacBio Revio"))
+    check state.project["instrument"] == "PacBio Revio"
+    update(state, Msg(kind: setProjectField, column: "instrument", value: ""))
+    check state.project["instrument"] == ""
+    update(state, Msg(kind: setProjectField, column: "instrument", value: "PacBio Revio"))
     state.samples[0]["notes"] = "Keep until reset"
     state.errors.add ValidationError(field: "contact_name", message: "error")
     state.editedFields.incl "contact_name"
     update(state, Msg(kind: resetRequest))
     check state.project["contact_name"] == ""
+    check state.project["instrument"] == ""
     check state.samples.len == 10
     check state.samples[0]["notes"] == ""
     check state.errors.len == 0

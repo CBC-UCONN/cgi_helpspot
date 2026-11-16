@@ -22,7 +22,7 @@ proc setProjectValue(project: var ProjectForm; key, value: string; boolValue: bo
     if fieldDef.key == key:
       if fieldDef.kind == checkboxField:
         project[key] = $boolValue
-      elif fieldDef.options.len == 0 or value in fieldDef.options:
+      elif fieldDef.options.len == 0 or value in fieldDef.options or (fieldDef.kind == selectField and value.len == 0):
         project[key] = value
       return
 

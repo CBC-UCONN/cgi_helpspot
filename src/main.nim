@@ -173,6 +173,7 @@ proc syncFieldFeedback(id, message: cstring) {.importjs: """
 
 var state = initialModel()
 var storageMessage = ""
+var projectResetRevision = 0
 let savedModel = readSavedModel()
 if savedModel == nil:
   storageMessage = "Progress cannot be saved in this browser."
@@ -186,6 +187,7 @@ proc dispatch(msg: Msg) =
       syncStorageMessage(cstring(storageMessage))
       return
     update(state, msg)
+    inc projectResetRevision
     storageMessage = ""
     syncStorageMessage(cstring(storageMessage))
     return
@@ -249,6 +251,7 @@ proc projectFieldView(fieldDef: ProjectFieldDef): VNode =
           dispatch(Msg(kind: setProjectField, column: key, value: $n.value))
         proc onblur(ev: Event; n: VNode) =
           dispatch(Msg(kind: blurProjectField, column: key))
+        option(value = "", selected = value.len == 0): text ""
         for optionValue in fieldDef.options:
           option(value = optionValue, selected = optionValue == value):
             text optionValue
@@ -294,7 +297,7 @@ proc projectFieldView(fieldDef: ProjectFieldDef): VNode =
 
 proc projectSection(): VNode =
   let fields = visibleProjectFields(state.project)
-  buildHtml(section(class = "rounded-2xl border border-slate-200 bg-white p-6 shadow-sm")):
+  buildHtml(section(index = projectResetRevision, class = "rounded-2xl border border-slate-200 bg-white p-6 shadow-sm")):
     tdiv:
       h2(class = "text-xl font-semibold text-slate-900"): text "Project information"
       p(class = "mt-1 text-sm text-slate-500"): text "Fields and sample columns adapt to these answers."
@@ -426,7 +429,7 @@ proc app(): VNode =
         projectSection()
       sampleTable()
       tdiv(class = "flex justify-end"):
-        button(class = "rounded-md border border-red-300 bg-white px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-50", `type` = "button"):
+        button(class = "rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50", `type` = "button"):
           text "Reset"
           proc onclick =
             if confirmReset(): dispatch(Msg(kind: resetRequest))
