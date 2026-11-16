@@ -29,6 +29,35 @@ proc downloadText(filename, content: cstring) {.importjs: """
 
 proc checkboxChecked(id: cstring): bool {.importjs: "document.getElementById(#).checked".}
 
+proc navigateSampleCell(event: Event) {.importjs: """
+  (function(event) {
+    if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey || event.isComposing) return;
+    const control = event.target;
+    if (!control.matches('input, select')) return;
+    const cell = control.closest('td');
+    const row = cell && cell.parentElement;
+    const body = row && row.parentElement;
+    if (!body || body.tagName !== 'TBODY') return;
+    let rowIndex = row.sectionRowIndex;
+    let columnIndex = cell.cellIndex;
+    switch (event.key) {
+      case 'Enter':
+      case 'ArrowDown': rowIndex++; break;
+      case 'ArrowUp': rowIndex--; break;
+      case 'ArrowRight': columnIndex++; break;
+      case 'ArrowLeft': columnIndex--; break;
+      default: return;
+    }
+    const targetRow = body.rows[rowIndex];
+    const targetCell = targetRow && targetRow.cells[columnIndex];
+    const target = targetCell && targetCell.querySelector('input, select');
+    if (target) {
+      event.preventDefault();
+      target.focus();
+    }
+  })(#)
+""".}
+
 proc startFillDrag(event: Event; callback: proc(targetRow: int) {.closure.}; previewValue: proc(sourceValue: cstring; distance: int): cstring {.closure.}) {.importjs: """
   (function(event, callback, previewValue) {
     if (event.button !== 0) return;
@@ -301,6 +330,8 @@ proc sampleTable(): VNode =
                         helpInfo("sample-" & column.key, column.help)
                 th(class = "w-8 border border-slate-300 p-0"): text ""
           tbody(index = state.sampleRevision):
+            proc onkeydown(ev: Event; n: VNode) {.noredraw.} =
+              navigateSampleCell(ev)
             for i, row in state.samples:
               tr:
                 td(class = "w-9 border border-slate-300 px-1 py-1 text-center align-top text-xs text-slate-500"):
