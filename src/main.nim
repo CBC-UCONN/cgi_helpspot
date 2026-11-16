@@ -67,9 +67,20 @@ proc inputClass(field: string): string =
   "w-full rounded-lg border bg-white px-3 py-2 text-sm shadow-sm outline-none transition focus:ring-2 " &
   (if hasError(field): "border-red-400 focus:border-red-500 focus:ring-red-100" else: "border-slate-300 focus:border-blue-500 focus:ring-blue-100")
 
-proc labelText(label, field: string): VNode =
-  buildHtml(label(`for` = field, class = "mb-1 block text-sm font-medium text-slate-700")):
-    text label
+proc helpInfo(id, help: string): VNode =
+  let tooltipId = id & "-help"
+  buildHtml(span(class = "group relative inline-flex shrink-0 align-middle")):
+    button(`type` = "button", class = "inline-flex h-4 w-4 items-center justify-center rounded-full border border-slate-400 text-[10px] font-semibold leading-none text-slate-600 hover:bg-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600", `aria-label` = "Information", `aria-describedby` = tooltipId):
+      text "i"
+    span(id = tooltipId, role = "tooltip", class = "absolute left-0 top-full z-30 mt-2 hidden w-64 max-w-[calc(100vw-2rem)] rounded-md bg-slate-900 px-3 py-2 text-xs font-normal leading-relaxed text-white shadow-lg group-hover:block group-focus-within:block"):
+      text help
+
+proc labelText(label, field, help: string): VNode =
+  buildHtml(tdiv(class = "mb-1 flex items-center gap-1")):
+    label(`for` = field, class = "block text-sm font-medium text-slate-700"):
+      text label
+    if help.len > 0:
+      helpInfo("project-" & field, help)
 
 proc errorText(field: string): VNode =
   let message = fieldError(field)
@@ -82,19 +93,17 @@ proc projectFieldView(fieldDef: ProjectFieldDef): VNode =
   case fieldDef.kind
   of textField, emailField:
     buildHtml(tdiv(class = "space-y-1")):
-      labelText(fieldDef.label, key)
+      labelText(fieldDef.label, key, fieldDef.help)
       input(id = key, class = inputClass(key), value = value, `aria-invalid` = (if hasError(key): "true" else: "false"), `aria-describedby` = key & "-error", `type` = (if fieldDef.kind == emailField: "email" else: "text")):
         proc oninput(ev: Event; n: VNode) {.noredraw.} =
           dispatch(Msg(kind: setProjectField, column: key, value: $n.value))
           syncFieldFeedback(cstring(key), cstring(fieldError(key)))
         proc onblur(ev: Event; n: VNode) =
           dispatch(Msg(kind: blurProjectField, column: key))
-      if fieldDef.help.len > 0:
-        p(class = "text-xs text-slate-500"): text fieldDef.help
       errorText(key)
   of selectField:
     buildHtml(tdiv(class = "space-y-1")):
-      labelText(fieldDef.label, key)
+      labelText(fieldDef.label, key, fieldDef.help)
       select(id = key, class = inputClass(key), value = value, `aria-invalid` = (if hasError(key): "true" else: "false"), `aria-describedby` = key & "-error"):
         proc onchange(ev: Event; n: VNode) =
           dispatch(Msg(kind: setProjectField, column: key, value: $n.value))
@@ -103,12 +112,13 @@ proc projectFieldView(fieldDef: ProjectFieldDef): VNode =
         for optionValue in fieldDef.options:
           option(value = optionValue, selected = optionValue == value):
             text optionValue
-      if fieldDef.help.len > 0:
-        p(class = "text-xs text-slate-500"): text fieldDef.help
       errorText(key)
   of choiceField:
     buildHtml(fieldset(class = "space-y-2", `aria-describedby` = key & "-error")):
-      legend(class = "block text-sm font-medium text-slate-700"): text fieldDef.label
+      legend(class = "flex items-center gap-1 text-sm font-medium text-slate-700"):
+        text fieldDef.label
+        if fieldDef.help.len > 0:
+          helpInfo("project-" & key, fieldDef.help)
       for optionValue in fieldDef.options:
         label(class = "flex items-start gap-2 text-sm text-slate-700"):
           input(`type` = "radio", name = key, value = optionValue, checked = optionValue == value, class = "mt-1", `aria-invalid` = (if hasError(key): "true" else: "false"), `aria-describedby` = key & "-error"):
@@ -117,54 +127,67 @@ proc projectFieldView(fieldDef: ProjectFieldDef): VNode =
             proc onblur(ev: Event; n: VNode) =
               dispatch(Msg(kind: blurProjectField, column: key))
           span: text optionValue
-      if fieldDef.help.len > 0:
-        p(class = "text-xs text-slate-500"): text fieldDef.help
       errorText(key)
   of checkboxField:
     buildHtml(tdiv(class = "rounded-xl border border-slate-200 bg-slate-50 p-4")):
-      label(class = "flex cursor-pointer items-start gap-3"):
-        input(id = key, `type` = "checkbox", class = "mt-1 h-4 w-4 rounded border-slate-300", checked = value == "true", `aria-invalid` = (if hasError(key): "true" else: "false"), `aria-describedby` = key & "-error"):
-          proc onchange(ev: Event; n: VNode) =
-            dispatch(Msg(kind: setProjectField, column: key, boolValue: checkboxChecked(key)))
-          proc onblur(ev: Event; n: VNode) =
-            dispatch(Msg(kind: blurProjectField, column: key))
-        span:
+      tdiv(class = "flex items-start gap-2"):
+        label(class = "flex cursor-pointer items-start gap-3"):
+          input(id = key, `type` = "checkbox", class = "mt-1 h-4 w-4 rounded border-slate-300", checked = value == "true", `aria-invalid` = (if hasError(key): "true" else: "false"), `aria-describedby` = key & "-error"):
+            proc onchange(ev: Event; n: VNode) =
+              dispatch(Msg(kind: setProjectField, column: key, boolValue: checkboxChecked(key)))
+            proc onblur(ev: Event; n: VNode) =
+              dispatch(Msg(kind: blurProjectField, column: key))
           span(class = "block text-sm font-medium text-slate-800"): text fieldDef.label
-          if fieldDef.help.len > 0:
-            span(class = "mt-1 block text-xs text-slate-500"): text fieldDef.help
+        if fieldDef.help.len > 0:
+          helpInfo("project-" & key, fieldDef.help)
       errorText(key)
   of textareaField:
     buildHtml(tdiv(class = "space-y-1")):
-      labelText(fieldDef.label, key)
+      labelText(fieldDef.label, key, fieldDef.help)
       textarea(id = key, class = inputClass(key), rows = "4", value = value, `aria-invalid` = (if hasError(key): "true" else: "false"), `aria-describedby` = key & "-error"):
         proc oninput(ev: Event; n: VNode) {.noredraw.} =
           dispatch(Msg(kind: setProjectField, column: key, value: $n.value))
           syncFieldFeedback(cstring(key), cstring(fieldError(key)))
         proc onblur(ev: Event; n: VNode) =
           dispatch(Msg(kind: blurProjectField, column: key))
-      if fieldDef.help.len > 0:
-        p(class = "text-xs text-slate-500"): text fieldDef.help
       errorText(key)
 
 proc projectSection(): VNode =
+  let fields = visibleProjectFields(state.project)
   buildHtml(section(class = "rounded-2xl border border-slate-200 bg-white p-6 shadow-sm")):
     tdiv:
-      h2(class = "text-lg font-semibold text-slate-900"): text "Project information"
+      h2(class = "text-xl font-semibold text-slate-900"): text "Project information"
       p(class = "mt-1 text-sm text-slate-500"): text "Fields and sample columns adapt to these answers."
     tdiv(class = "mt-6 grid gap-5 md:grid-cols-2"):
-      for fieldDef in visibleProjectFields(state.project):
-        projectFieldView(fieldDef)
+      for fieldDef in fields:
+        if fieldDef.fullWidth:
+          tdiv(class = "md:col-span-2"):
+            projectFieldView(fieldDef)
+        else:
+          projectFieldView(fieldDef)
 
 proc sampleCell(rowIndex: int; column: SampleColumnDef; value: string): VNode =
   let key = "sample[" & $(rowIndex + 1) & "]." & column.key
+  let cellClass = if hasError(key): "block w-full min-w-0 border-0 bg-white px-2 py-1.5 text-sm text-red-700 outline-none ring-1 ring-inset ring-red-400" else: "block w-full min-w-0 border-0 bg-white px-2 py-1.5 text-sm outline-none focus:ring-1 focus:ring-inset focus:ring-blue-500"
   buildHtml(td(class = column.widthClass & " border border-slate-300 p-0 align-top")):
-    input(id = key, size = "1", class = (if hasError(key): "block w-full min-w-0 border-0 bg-white px-2 py-1.5 text-sm text-red-700 outline-none ring-1 ring-inset ring-red-400" else: "block w-full min-w-0 border-0 bg-white px-2 py-1.5 text-sm outline-none focus:ring-1 focus:ring-inset focus:ring-blue-500"), value = value, `aria-label` = column.label & ", row " & $(rowIndex + 1), `aria-invalid` = (if hasError(key): "true" else: "false"), `aria-describedby` = key & "-error"):
-      proc oninput(ev: Event; n: VNode) {.noredraw.} =
-        dispatch(Msg(kind: setSampleCell, row: rowIndex, column: column.key, value: $n.value))
-        for index in 0 ..< state.samples.len:
-          let cellKey = "sample[" & $(index + 1) & "]." & column.key
-          syncFieldFeedback(cstring(cellKey), cstring(fieldError(cellKey)))
-      proc onblur(ev: Event; n: VNode) = dispatch(Msg(kind: blurSampleCell, row: rowIndex, column: column.key))
+    if column.options.len > 0:
+      select(id = key, class = cellClass, value = value, `aria-label` = column.label & ", row " & $(rowIndex + 1), `aria-invalid` = (if hasError(key): "true" else: "false"), `aria-describedby` = key & "-error"):
+        proc onchange(ev: Event; n: VNode) =
+          dispatch(Msg(kind: setSampleCell, row: rowIndex, column: column.key, value: $n.value))
+        proc onblur(ev: Event; n: VNode) = dispatch(Msg(kind: blurSampleCell, row: rowIndex, column: column.key))
+        option(value = "", selected = value.len == 0): text ""
+        if value.len > 0 and value notin column.options:
+          option(value = value, selected = true): text value
+        for optionValue in column.options:
+          option(value = optionValue, selected = optionValue == value): text optionValue
+    else:
+      input(id = key, size = "1", class = cellClass, value = value, `aria-label` = column.label & ", row " & $(rowIndex + 1), `aria-invalid` = (if hasError(key): "true" else: "false"), `aria-describedby` = key & "-error"):
+        proc oninput(ev: Event; n: VNode) {.noredraw.} =
+          dispatch(Msg(kind: setSampleCell, row: rowIndex, column: column.key, value: $n.value))
+          for index in 0 ..< state.samples.len:
+            let cellKey = "sample[" & $(index + 1) & "]." & column.key
+            syncFieldFeedback(cstring(cellKey), cstring(fieldError(cellKey)))
+        proc onblur(ev: Event; n: VNode) = dispatch(Msg(kind: blurSampleCell, row: rowIndex, column: column.key))
     errorText(key)
 
 proc removeSampleButton(rowIndex: int): VNode =
@@ -174,39 +197,62 @@ proc removeSampleButton(rowIndex: int): VNode =
 
 proc sampleTable(): VNode =
   let columns = visibleSampleColumns(state.project)
+  let dependenciesSelected = spreadsheetDependenciesSelected(state.project)
+  var dependencyLabels: seq[string]
+  for fieldDef in projectSchema:
+    if fieldDef.spreadsheetDependency:
+      dependencyLabels.add fieldDef.label
+  let dependencyMessage = "Choose options for " & dependencyLabels.join(" and ") & " before entering sample data."
   buildHtml(section(class = "rounded-2xl border border-slate-200 bg-white shadow-sm")):
     tdiv(class = "flex flex-col gap-4 border-b border-slate-200 p-6 sm:flex-row sm:items-center sm:justify-between"):
       tdiv:
-        h2(class = "text-lg font-semibold text-slate-900"): text "Samples"
-        p(class = "mt-1 text-sm text-slate-500"): text $(state.samples.len) & " sample row(s). Columns reflect the project settings."
+        h2(class = "text-xl font-semibold text-slate-900"): text "Samples"
       tdiv(class = "flex flex-wrap gap-2"):
-        button(class = "rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50", `type` = "button"):
+        button(class = (if dependenciesSelected: "rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50" else: "cursor-not-allowed rounded-lg border border-slate-300 bg-slate-100 px-3 py-2 text-sm font-medium text-slate-400"), `type` = "button", disabled = not dependenciesSelected):
           text "Download CSV template"
           proc onclick = downloadText("sequencing-samples.csv", templateCsv(state.project))
-        label(class = "cursor-pointer rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"):
+        label(class = (if dependenciesSelected: "cursor-pointer rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50" else: "cursor-not-allowed rounded-lg border border-slate-300 bg-slate-100 px-3 py-2 text-sm font-medium text-slate-400")):
           text "Upload CSV"
-          input(id = "csv-file", class = "hidden", `type` = "file", accept = ".csv,text/csv"):
+          input(id = "csv-file", class = "hidden", `type` = "file", accept = ".csv,text/csv", disabled = not dependenciesSelected):
             proc onchange = readFileInput("csv-file", proc(content: cstring) = dispatch(Msg(kind: csvLoaded, value: $content)))
     if state.csvMessage.len > 0:
       tdiv(class = "mx-6 mt-4 rounded-lg bg-blue-50 px-4 py-3 text-sm text-blue-800"): text state.csvMessage
-    tdiv(class = "overflow-x-auto"):
-      table(class = "w-max table-auto border-collapse"):
-        thead(class = "bg-slate-50"):
-          tr:
-            th(class = "w-9 border border-slate-300 px-1 py-2 text-center text-xs font-medium text-slate-500"): text "#"
-            for column in columns:
-              th(class = column.widthClass & " border border-slate-300 px-2 py-2 text-left text-xs font-semibold text-slate-600"): text column.label
-            th(class = "w-8 border border-slate-300 p-0"): text ""
-        tbody(index = state.sampleRevision):
-          for i, row in state.samples:
-            tr:
-              td(class = "w-9 border border-slate-300 px-1 py-1 text-center align-top text-xs text-slate-500"): text $(i + 1)
-              for column in columns:
-                sampleCell(i, column, field(row, column.key))
-              td(class = "w-8 border border-slate-300 p-0 align-top"):
-                removeSampleButton(i)
+    tdiv(class = "relative overflow-x-auto"):
+      tdiv(class = (if dependenciesSelected: "" else: "pointer-events-none select-none blur-sm"), `aria-hidden` = (if dependenciesSelected: "false" else: "true")):
+        table(class = "w-max table-auto border-collapse"):
+          if dependenciesSelected:
+            thead(class = "bg-slate-50"):
+              tr:
+                th(class = "w-9 border border-slate-300 px-1 py-2 text-center text-xs font-medium text-slate-500"): text "#"
+                for column in columns:
+                  th(class = column.widthClass & " border border-slate-300 px-2 py-2 text-left text-xs font-semibold text-slate-600"):
+                    tdiv(class = "inline-flex items-center gap-1"):
+                      text column.label
+                      if column.help.len > 0:
+                        helpInfo("sample-" & column.key, column.help)
+                th(class = "w-8 border border-slate-300 p-0"): text ""
+          tbody(index = state.sampleRevision):
+            for i, row in state.samples:
+              tr:
+                td(class = "w-9 border border-slate-300 px-1 py-1 text-center align-top text-xs text-slate-500"):
+                  text $(i + 1)
+                for column in columns:
+                  if dependenciesSelected:
+                    sampleCell(i, column, field(row, column.key))
+                  else:
+                    td(class = column.widthClass & " border border-slate-300 p-0 align-top"):
+                      tdiv(class = "h-8")
+                td(class = "w-8 border border-slate-300 p-0 align-top"):
+                  if dependenciesSelected:
+                    removeSampleButton(i)
+                  else:
+                    tdiv(class = "h-8")
+      if not dependenciesSelected:
+        tdiv(class = "pointer-events-none absolute inset-0 z-10 flex min-h-64 items-center justify-center px-6 text-center", role = "status"):
+          p(class = "max-w-md text-sm font-semibold text-slate-900 drop-shadow-[0_1px_2px_rgba(255,255,255,0.95)]"):
+            text dependencyMessage
     tdiv(class = "flex flex-col gap-3 border-t border-slate-200 p-6 sm:flex-row sm:items-center sm:justify-between"):
-      button(class = "rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800", `type` = "button"):
+      button(class = (if dependenciesSelected: "rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800" else: "cursor-not-allowed rounded-lg bg-slate-400 px-4 py-2 text-sm font-semibold text-white"), `type` = "button", disabled = not dependenciesSelected):
         text "+ Add sample"
         proc onclick = dispatch(Msg(kind: addSample))
       p(class = "text-xs text-slate-500"): text "Tip: download a template after changing the project settings so its columns stay synchronized."

@@ -21,7 +21,8 @@ suite "blur validation and submission":
 
   test "sample cells validate on blur":
     var state = initialModel()
-    update(state, Msg(kind: setSampleCell, row: 0, column: "tube_id", value: "too-long"))
+    update(state, Msg(kind: setProjectField, column: "library_preparation", value: "Library preparation needed"))
+    update(state, Msg(kind: setSampleCell, row: 0, column: "tube_id", value: "too-long-value"))
     check state.errors.len == 0
     update(state, Msg(kind: blurSampleCell, row: 0, column: "tube_id"))
     check state.hasField("sample[1].tube_id")
@@ -33,12 +34,14 @@ suite "blur validation and submission":
 
   test "removing a row deletes its data and remaps remaining errors":
     var state = initialModel()
+    state.samples = @[emptySample()]
+    update(state, Msg(kind: setProjectField, column: "library_preparation", value: "Library preparation needed"))
     update(state, Msg(kind: addSample))
     update(state, Msg(kind: addSample))
     update(state, Msg(kind: setSampleCell, row: 0, column: "sample_id", value: "first"))
     update(state, Msg(kind: setSampleCell, row: 1, column: "sample_id", value: "second"))
     update(state, Msg(kind: setSampleCell, row: 2, column: "sample_id", value: "third"))
-    update(state, Msg(kind: setSampleCell, row: 2, column: "tube_id", value: "too-long"))
+    update(state, Msg(kind: setSampleCell, row: 2, column: "tube_id", value: "too-long-value"))
     update(state, Msg(kind: blurSampleCell, row: 2, column: "tube_id"))
     update(state, Msg(kind: removeSample, row: 1))
     check state.samples.len == 2
@@ -49,10 +52,12 @@ suite "blur validation and submission":
 
   test "removing the only row clears its data and validation state":
     var state = initialModel()
+    state.samples = @[emptySample()]
+    update(state, Msg(kind: setProjectField, column: "library_preparation", value: "Library preparation needed"))
     update(state, Msg(kind: setProjectField, column: "contact_email", value: "bad"))
     update(state, Msg(kind: blurProjectField, column: "contact_email"))
     update(state, Msg(kind: setSampleCell, row: 0, column: "sample_id", value: "sample1"))
-    update(state, Msg(kind: setSampleCell, row: 0, column: "tube_id", value: "too-long"))
+    update(state, Msg(kind: setSampleCell, row: 0, column: "tube_id", value: "too-long-value"))
     update(state, Msg(kind: blurSampleCell, row: 0, column: "tube_id"))
     check state.hasField("sample[1].tube_id")
     update(state, Msg(kind: removeSample, row: 0))
@@ -66,6 +71,8 @@ suite "blur validation and submission":
 
   test "editing another row clears a visible duplicate error":
     var state = initialModel()
+    state.samples = @[emptySample()]
+    update(state, Msg(kind: setProjectField, column: "library_preparation", value: "Library preparation needed"))
     update(state, Msg(kind: addSample))
     update(state, Msg(kind: setSampleCell, row: 0, column: "sample_id", value: "same"))
     update(state, Msg(kind: setSampleCell, row: 1, column: "sample_id", value: "same"))
@@ -83,6 +90,7 @@ suite "blur validation and submission":
 
   test "valid submit reaches the unconnected stub":
     var state = initialModel()
+    state.samples = @[emptySample()]
     state.project["contact_name"] = "Name"
     state.project["contact_email"] = "name@example.com"
     state.project["principal_investigator"] = "PI"
