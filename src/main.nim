@@ -180,13 +180,9 @@ proc syncFieldFeedback(id, message: cstring) {.importjs: """
 """.}
 
 var state = initialModel()
+var submitOverride: proc(state: AppModel)
 var storageMessage = ""
 var projectResetRevision = 0
-let savedModel = readSavedModel()
-if savedModel == nil:
-  storageMessage = "Progress cannot be saved in this browser."
-elif ($savedModel).len > 0 and not decodeModel($savedModel, state):
-  storageMessage = "Saved progress could not be restored."
 
 proc dispatch(msg: Msg) =
   if msg.kind == resetRequest:
@@ -203,13 +199,17 @@ proc dispatch(msg: Msg) =
   let wasSubmitting = state.submitting
   update(state, msg)
   if msg.kind == submitRequest and not wasSubmitting and state.submitting:
-    if helpSpotUrl.len == 0:
-      update(state, Msg(kind: submissionFinished, value: "HelpSpot URL is not configured."))
+    if submitOverride != nil:
+      update(state, Msg(kind: submissionFinished, value: ""))
+      submitOverride(state)
     else:
-      discard postHelpSpot(helpSpotUrl, helpSpotCategory, state,
-        proc(message: string) =
-          dispatch(Msg(kind: submissionFinished, value: message))
-          redraw())
+      if helpSpotUrl.len == 0:
+        update(state, Msg(kind: submissionFinished, value: "HelpSpot URL is not configured."))
+      else:
+        discard postHelpSpot(helpSpotUrl, helpSpotCategory, state,
+          proc(message: string) =
+            dispatch(Msg(kind: submissionFinished, value: message))
+            redraw())
   if not saveModel(cstring(encodeModel(state))):
     storageMessage = "Progress could not be saved in this browser."
   else:
@@ -452,4 +452,15 @@ proc app(): VNode =
           proc onclick =
             if confirmReset(): dispatch(Msg(kind: resetRequest))
 
-setRenderer app, "app"
+proc startApp*(initialState: AppModel; submit: proc(state: AppModel) = nil) =
+  state = initialState
+  submitOverride = submit
+  let savedModel = readSavedModel()
+  if savedModel == nil:
+    storageMessage = "Progress cannot be saved in this browser."
+  elif ($savedModel).len > 0 and not decodeModel($savedModel, state):
+    storageMessage = "Saved progress could not be restored."
+  setRenderer app, "app"
+
+when isMainModule:
+  startApp(initialModel())
