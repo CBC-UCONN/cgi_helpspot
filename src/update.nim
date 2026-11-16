@@ -6,12 +6,13 @@ import csvio
 type
   MsgKind* = enum
     setProjectField, blurProjectField,
-    addSample, removeSample, setSampleCell, blurSampleCell,
+    addSample, removeSample, setSampleCell, blurSampleCell, fillSampleCells,
     downloadTemplate, csvLoaded, submitRequest
 
   Msg* = object
     kind*: MsgKind
     row*: int
+    targetRow*: int
     column*: string
     value*: string
     boolValue*: bool
@@ -48,6 +49,55 @@ proc remapRowKey(key: string; removedRow: int): string =
 proc hasFieldError(m: AppModel; key: string): bool =
   for error in m.errors:
     if error.field == key: return true
+
+proc sampleFillValue*(value: string; distance: int; hasOptions: bool): string =
+  if hasOptions or distance == 0 or value.len == 0:
+    return value
+  var numberStart = value.len
+  while numberStart > 0 and value[numberStart - 1] in {'0'..'9'}:
+    dec numberStart
+  if numberStart == 0 or numberStart == value.len:
+    return value
+  var digits = value[numberStart .. ^1]
+  if distance < 0:
+    let width = digits.len
+    var amount = $(-(distance + 1))
+    var carry = 1
+    var index = amount.high
+    while index >= 0 and carry > 0:
+      let sum = ord(amount[index]) - ord('0') + carry
+      amount[index] = chr(ord('0') + sum mod 10)
+      carry = sum div 10
+      dec index
+    if carry > 0:
+      amount = "1" & amount
+    let length = max(digits.len, amount.len)
+    digits = repeat('0', length - digits.len) & digits
+    amount = repeat('0', length - amount.len) & amount
+    let negative = digits < amount
+    if negative:
+      swap(digits, amount)
+    var borrow = 0
+    for digitIndex in countdown(length - 1, 0):
+      var difference = ord(digits[digitIndex]) - ord(amount[digitIndex]) - borrow
+      borrow = 0
+      if difference < 0:
+        difference += 10
+        borrow = 1
+      digits[digitIndex] = chr(ord('0') + difference)
+    while digits.len > width and digits[0] == '0':
+      digits = digits[1 .. ^1]
+    return value[0 ..< numberStart] & (if negative: "-" else: "") & digits
+  var carry = distance
+  var index = digits.high
+  while index >= 0 and carry > 0:
+    let sum = ord(digits[index]) - ord('0') + carry mod 10
+    digits[index] = chr(ord('0') + sum mod 10)
+    carry = carry div 10 + sum div 10
+    dec index
+  if carry > 0:
+    digits = $carry & digits
+  value[0 ..< numberStart] & digits
 
 proc refreshSampleColumn(m: var AppModel; key: string; column: string) =
   let errors = validateSampleColumn(m.samples, m.project, column)
@@ -128,6 +178,22 @@ proc update*(m: var AppModel; msg: Msg) =
         m.refreshSampleColumn(key, msg.column)
         if m.hasFieldError(key): m.liveFields.incl(key)
         else: m.liveFields.excl(key)
+  of fillSampleCells:
+    if msg.row >= 0 and msg.row < m.samples.len and msg.targetRow >= 0 and msg.targetRow < m.samples.len:
+      var columnVisible = false
+      var hasOptions = false
+      for column in visibleSampleColumns(m.project):
+        if column.key == msg.column:
+          columnVisible = true
+          hasOptions = column.options.len > 0
+          break
+      if columnVisible:
+        let value = m.samples[msg.row].field(msg.column)
+        for row in min(msg.row, msg.targetRow) .. max(msg.row, msg.targetRow):
+          if row != msg.row:
+            let filledValue = sampleFillValue(value, row - msg.row, hasOptions)
+            update(m, Msg(kind: setSampleCell, row: row, column: msg.column, value: filledValue))
+            update(m, Msg(kind: blurSampleCell, row: row, column: msg.column))
   of downloadTemplate: discard
   of csvLoaded:
     let parsed = parseCsv(msg.value, m.project)

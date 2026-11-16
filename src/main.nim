@@ -29,6 +29,67 @@ proc downloadText(filename, content: cstring) {.importjs: """
 
 proc checkboxChecked(id: cstring): bool {.importjs: "document.getElementById(#).checked".}
 
+proc startFillDrag(event: Event; callback: proc(targetRow: int) {.closure.}; previewValue: proc(sourceValue: cstring; distance: int): cstring {.closure.}) {.importjs: """
+  (function(event, callback, previewValue) {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    const cell = event.currentTarget.closest('td');
+    const body = cell.closest('tbody');
+    const sourceRow = cell.parentElement.sectionRowIndex;
+    const column = cell.cellIndex;
+    const sourceValue = cell.querySelector('input, select').value;
+    let targetRow = sourceRow;
+    const highlighted = [];
+    function clearPreview() {
+      for (const item of highlighted) {
+        item.cell.style.boxShadow = item.shadow;
+        if (item.preview) item.preview.remove();
+      }
+      highlighted.length = 0;
+    }
+    function move(moveEvent) {
+      const element = document.elementFromPoint(moveEvent.clientX, moveEvent.clientY);
+      const row = element && element.closest('tr');
+      if (!row || row.parentElement !== body) return;
+      targetRow = row.sectionRowIndex;
+      clearPreview();
+      for (let index = Math.min(sourceRow, targetRow); index <= Math.max(sourceRow, targetRow); index++) {
+        const selectedCell = body.rows[index].cells[column];
+        let preview = null;
+        if (index !== sourceRow) {
+          const control = selectedCell.querySelector('input, select');
+          preview = document.createElement('div');
+          preview.className = 'pointer-events-none absolute left-0 top-0 z-[5] w-full overflow-hidden whitespace-nowrap bg-white px-2 py-1.5 text-sm';
+          preview.style.height = control.offsetHeight + 'px';
+          preview.setAttribute('aria-hidden', 'true');
+          preview.textContent = previewValue(sourceValue, index - sourceRow);
+          selectedCell.appendChild(preview);
+        }
+        highlighted.push({cell: selectedCell, shadow: selectedCell.style.boxShadow, preview});
+        selectedCell.style.boxShadow = 'inset 0 0 0 2px rgb(37, 99, 235)';
+      }
+    }
+    function cleanup() {
+      clearPreview();
+      document.removeEventListener('mousemove', move);
+      document.removeEventListener('mouseup', finish);
+      document.removeEventListener('keydown', cancel);
+      window.removeEventListener('blur', cleanup);
+    }
+    function finish() {
+      cleanup();
+      if (targetRow !== sourceRow) callback(targetRow);
+    }
+    function cancel(keyEvent) {
+      if (keyEvent.key === 'Escape') cleanup();
+    }
+    document.addEventListener('mousemove', move);
+    document.addEventListener('mouseup', finish);
+    document.addEventListener('keydown', cancel);
+    window.addEventListener('blur', cleanup);
+  })(#, #, #)
+""".}
+
 proc syncFieldFeedback(id, message: cstring) {.importjs: """
   (function(id, message) {
     const input = document.getElementById(id);
@@ -169,7 +230,7 @@ proc projectSection(): VNode =
 proc sampleCell(rowIndex: int; column: SampleColumnDef; value: string): VNode =
   let key = "sample[" & $(rowIndex + 1) & "]." & column.key
   let cellClass = if hasError(key): "block w-full min-w-0 border-0 bg-white px-2 py-1.5 text-sm text-red-700 outline-none ring-1 ring-inset ring-red-400" else: "block w-full min-w-0 border-0 bg-white px-2 py-1.5 text-sm outline-none focus:ring-1 focus:ring-inset focus:ring-blue-500"
-  buildHtml(td(class = column.widthClass & " border border-slate-300 p-0 align-top")):
+  buildHtml(td(class = column.widthClass & " group relative border border-slate-300 p-0 align-top")):
     if column.options.len > 0:
       select(id = key, class = cellClass, value = value, `aria-label` = column.label & ", row " & $(rowIndex + 1), `aria-invalid` = (if hasError(key): "true" else: "false"), `aria-describedby` = key & "-error"):
         proc onchange(ev: Event; n: VNode) =
@@ -189,6 +250,14 @@ proc sampleCell(rowIndex: int; column: SampleColumnDef; value: string): VNode =
             syncFieldFeedback(cstring(cellKey), cstring(fieldError(cellKey)))
         proc onblur(ev: Event; n: VNode) = dispatch(Msg(kind: blurSampleCell, row: rowIndex, column: column.key))
     errorText(key)
+    button(`type` = "button", tabindex = "-1", class = "pointer-events-none absolute bottom-0 right-0 z-10 h-3 w-3 cursor-crosshair border border-white bg-blue-600 opacity-0 group-focus-within:pointer-events-auto group-focus-within:opacity-100", title = "Drag to copy up or down", `aria-label` = "Drag to copy " & column.label & " from row " & $(rowIndex + 1)):
+      proc onmousedown(ev: Event; n: VNode) {.noredraw.} =
+        startFillDrag(ev,
+          proc(targetRow: int) =
+            dispatch(Msg(kind: fillSampleCells, row: rowIndex, targetRow: targetRow, column: column.key))
+            redraw(),
+          proc(sourceValue: cstring; distance: int): cstring =
+            cstring(sampleFillValue($sourceValue, distance, column.options.len > 0)))
 
 proc removeSampleButton(rowIndex: int): VNode =
   buildHtml(button(class = "h-8 w-8 text-sm font-bold text-red-600 hover:bg-red-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-red-600", `type` = "button", `aria-label` = "Remove row " & $(rowIndex + 1), title = "Remove row")):
