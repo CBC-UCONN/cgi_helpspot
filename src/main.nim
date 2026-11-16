@@ -1,15 +1,7 @@
-import std/[jsffi, strutils, parsecfg, streams]
+import std/[jsffi, strutils]
 import karax/[karaxdsl, vdom, kbase]
 import karax/karax
 import model, update, csvio, persistence, helpspot_api
-
-const helpSpotUrl = static:
-  let config = loadConfig(newStringStream(staticRead("../config.ini")))
-  config.getSectionValue("helpspot", "url")
-
-const helpSpotCategory = static:
-  let config = loadConfig(newStringStream(staticRead("../config.ini")))
-  config.getSectionValue("helpspot", "category")
 
 proc readSavedModel(): cstring {.importjs: """
   (function() {
@@ -225,7 +217,7 @@ proc dispatch(msg: Msg) =
       if helpSpotUrl.len == 0:
         update(state, Msg(kind: submissionFinished, value: "HelpSpot URL is not configured."))
       else:
-        discard postHelpSpot(helpSpotUrl, helpSpotCategory, state,
+        discard postHelpSpot(helpSpotUrl, helpSpotCategory, helpSpotReportingTags, state,
           proc(message: string) =
             dispatch(Msg(kind: submissionFinished, value: message))
             redraw())

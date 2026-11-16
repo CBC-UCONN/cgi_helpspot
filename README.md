@@ -105,7 +105,7 @@ Add a `SampleColumnDef` to `sampleColumnSchema`. Sample storage, the table, and 
 
 ### HelpSpot submission
 
-Set the public `request.create` URL and category ID in `config.ini` and run `nimble buildWeb` after changing them. Quote the URL in the INI file. These settings are included in the browser bundle and must not contain credentials or secrets.
+Set the HelpSpot base URL, category ID, and optional `reportingTags` in `config.ini` and run `nimble buildWeb` after changing them. Quote the URL and reporting tags in the INI file. The client appends the public `request.create` API path to the base URL and sends nonempty reporting tags as configured. These settings are included in the browser bundle and must not contain credentials or secrets.
 
 Run `nimble testHelpSpot` to create a real, clearly labeled test request in the configured category, including YAML and CSV attachments. It uses Node.js 18 or newer and the same model update and HelpSpot client as the application. The test uses `helpspot-test@example.com` as a placeholder contact address; it cannot receive notification emails. The task exits unsuccessfully if the submission cannot be confirmed. Check HelpSpot for an existing test request before retrying after a network error.
 

@@ -1,5 +1,17 @@
-import std/[json, strutils, xmlparser, xmltree, asyncjs, jsfetch, httpcore, base64]
+import std/[json, strutils, xmlparser, xmltree, asyncjs, jsfetch, httpcore, base64, parsecfg, streams]
 import model, csvio
+
+const helpSpotUrl* = static:
+  let config = loadConfig(newStringStream(staticRead("../config.ini")))
+  config.getSectionValue("helpspot", "url")
+
+const helpSpotCategory* = static:
+  let config = loadConfig(newStringStream(staticRead("../config.ini")))
+  config.getSectionValue("helpspot", "category")
+
+const helpSpotReportingTags* = static:
+  let config = loadConfig(newStringStream(staticRead("../config.ini")))
+  config.getSectionValue("helpspot", "reportingTags")
 
 proc projectMessage*(project: ProjectForm): string =
   for fieldDef in projectSchema:
@@ -39,7 +51,7 @@ proc responseMessage*(body: string; ok: bool; status: int): string =
           return "Request submitted successfully. Request number: " & requestNumber
   "HelpSpot returned an unexpected response. Check whether the request was created before retrying."
 
-proc postHelpSpot*(url, category: string; state: AppModel;
+proc postHelpSpot*(url, category, reportingTags: string; state: AppModel;
                    callback: proc(message: string) {.closure.}) {.async.} =
   if url.len == 0:
     callback("HelpSpot URL is not configured.")
@@ -50,6 +62,8 @@ proc postHelpSpot*(url, category: string; state: AppModel;
   form.add("sEmail", cstring(state.project.field("contact_email")))
   if category.len > 0:
     form.add("xCategory", cstring(category))
+  if reportingTags.len > 0:
+    form.add("reportingTags", cstring(reportingTags))
   form.add("File1_sFilename", cstring("project.yaml"))
   form.add("File1_sFileMimeType", cstring("application/yaml"))
   form.add("File1_bFileBody", cstring(encode(projectYaml(state.project))))
@@ -60,7 +74,8 @@ proc postHelpSpot*(url, category: string; state: AppModel;
   var body: cstring
   try:
     let options = newFetchOptions(metod = HttpPost, body = cast[cstring](form), credentials = fcOmit, referrer = cstring(""))
-    response = await fetch(cstring(url), options)
+    let endpoint = url.strip(leading = false, chars = {'/'}) & "/api/index.php?method=request.create"
+    response = await fetch(cstring(endpoint), options)
     body = await response.text()
   except:
     callback("Network error: could not confirm submission. Check whether the request was created before retrying.")
