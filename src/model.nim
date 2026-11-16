@@ -313,7 +313,7 @@ let sampleColumnSchema* = @[
 
   # Notes
   SampleColumnDef(
-    key: "notes", label: "Notes", widthClass: "min-w-48", 
+    key: "additional_information", label: "Additional Information", widthClass: "min-w-48", 
     validators: @[maxLength(500)],
   ),
 ]
