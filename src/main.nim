@@ -82,8 +82,6 @@ proc navigateSampleCell(event: Event) {.importjs: """
       case 'Enter':
       case 'ArrowDown': rowIndex++; break;
       case 'ArrowUp': rowIndex--; break;
-      case 'ArrowRight': columnIndex++; break;
-      case 'ArrowLeft': columnIndex--; break;
       default: return;
     }
     const targetRow = body.rows[rowIndex];
