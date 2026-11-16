@@ -231,7 +231,7 @@ let sampleColumnSchema* = @[
   
   # Tube ID
   SampleColumnDef(
-    key: "tube_id", label: "Tube ID", required: true, widthClass: "min-w-20",
+    key: "tube_id", label: "Tube ID", required: true, widthClass: "min-w-24",
     help: "Up to 10 letters, numbers, underscores, hyphens, or periods.",
     validators: @[maxLength(10), allowedChars(identifierChars, "letters, numbers, underscores, hyphens, and periods")],
   ),
@@ -265,7 +265,7 @@ let sampleColumnSchema* = @[
 
   # Concentration (ng/uL)
   SampleColumnDef(
-    key: "concentration_ng_ul", label: "Concentration (ng/uL)", required: true, widthClass: "min-w-40",
+    key: "concentration_ng_ul", label: "Concentration (ng/uL)", required: true, widthClass: "min-w-30",
     help: "Concentration of the sample in ng/uL.",
     validators: @[numberRange(0, 10000)],
   ),
@@ -279,32 +279,34 @@ let sampleColumnSchema* = @[
 
   # Desired Read depth
   SampleColumnDef(
-    key: "read_depth", label: "Desired Read Depth", required: true, widthClass: "min-w-32",
+    key: "read_depth", label: "Desired Read Depth", required: true, widthClass: "min-w-16",
     help: "Desired mean read depth per base for the sample.",
     validators: @[numberRange(0, 10000)],
   ),
 
   # i7 Index
   SampleColumnDef(
-    key: "i7_index", label: "i7 Index", required: true, widthClass: "min-w-40",
+    key: "i7_index", label: "i7 Index", required: true, widthClass: "min-w-32",
     help: "i7 Index sequence. Valid values are A, C, G, T, or N",
     validators: @[maxLength(40), allowedChars(indexChars, "A, C, G, T, or N allowed")],
     displayIf: proc(project: ProjectForm): bool =
-      project.field("library_preparation") == "User prepared library",
+      project.field("library_preparation") == "User prepared library" and
+      project.field("instrument") == "Illumina NovaSeq 6000",
   ),
 
   # i5 Index
   SampleColumnDef(
-    key: "i5_index", label: "i5 Index", widthClass: "min-w-40",
+    key: "i5_index", label: "i5 Index", widthClass: "min-w-32",
     validators: @[maxLength(40), allowedChars(indexChars, "A, C, G, T, or N allowed")],
     displayIf: proc(project: ProjectForm): bool =
-      project.field("library_preparation") == "User prepared library",
+      project.field("library_preparation") == "User prepared library" and
+      project.field("instrument") == "Illumina NovaSeq 6000",
     help: "i5 Index sequence. Valid values are A, C, G, T, or N",
   ),
 
   # Sample Disposition
   SampleColumnDef(
-    key: "sample_disposition", label: "Sample Disposition", widthClass: "min-w-40",
+    key: "sample_disposition", label: "Sample Disposition", required: true, widthClass: "min-w-26",
     options: sampleDispositionOptions, validators: @[oneOf(sampleDispositionOptions)],
     help: "What should be done with the any remaining sample upon completion. Sample ."
   ),
