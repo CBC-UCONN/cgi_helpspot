@@ -1,7 +1,37 @@
 import std/[jsffi, strutils]
 import karax/[karaxdsl, vdom, kbase]
 import karax/karax
-import model, update, csvio
+import model, update, csvio, persistence
+
+proc readSavedModel(): cstring {.importjs: """
+  (function() {
+    try { return localStorage.getItem('seqrequest.model.v1') || ''; }
+    catch (_) { return null; }
+  })()
+""".}
+
+proc saveModel(data: cstring): bool {.importjs: """
+  (function(data) {
+    try { localStorage.setItem('seqrequest.model.v1', data); return true; }
+    catch (_) { return false; }
+  })(#)
+""".}
+
+proc clearSavedModel(): bool {.importjs: """
+  (function() {
+    try { localStorage.removeItem('seqrequest.model.v1'); return true; }
+    catch (_) { return false; }
+  })()
+""".}
+
+proc confirmReset(): bool {.importjs: "window.confirm('Are you sure you want to reset? Any existing input will be lost.')".}
+
+proc syncStorageMessage(message: cstring) {.importjs: """
+  (function(message) {
+    const notice = document.getElementById('storage-message');
+    if (notice) notice.textContent = message;
+  })(#)
+""".}
 
 proc readFileInput(id: cstring; callback: proc(content: cstring) {.closure.}) {.importjs: """
   (function(id, callback) {
@@ -142,9 +172,29 @@ proc syncFieldFeedback(id, message: cstring) {.importjs: """
 """.}
 
 var state = initialModel()
+var storageMessage = ""
+let savedModel = readSavedModel()
+if savedModel == nil:
+  storageMessage = "Progress cannot be saved in this browser."
+elif ($savedModel).len > 0 and not decodeModel($savedModel, state):
+  storageMessage = "Saved progress could not be restored."
 
 proc dispatch(msg: Msg) =
+  if msg.kind == resetRequest:
+    if not clearSavedModel():
+      storageMessage = "Progress could not be cleared. Reset was cancelled."
+      syncStorageMessage(cstring(storageMessage))
+      return
+    update(state, msg)
+    storageMessage = ""
+    syncStorageMessage(cstring(storageMessage))
+    return
   update(state, msg)
+  if not saveModel(cstring(encodeModel(state))):
+    storageMessage = "Progress could not be saved in this browser."
+  else:
+    storageMessage = ""
+  syncStorageMessage(cstring(storageMessage))
 
 proc fieldError(field: string): string =
   for e in state.errors:
@@ -370,9 +420,15 @@ proc app(): VNode =
           proc onclick = dispatch(Msg(kind: submitRequest))
     main(class = "space-y-6 px-6 py-8"):
       tdiv(class = "mx-auto max-w-7xl space-y-6"):
+        p(id = "storage-message", class = "text-sm font-medium text-red-700", role = "status"): text storageMessage
         if state.submissionMessage.len > 0:
           p(class = "text-sm font-medium text-slate-800", role = "status"): text state.submissionMessage
         projectSection()
       sampleTable()
+      tdiv(class = "flex justify-end"):
+        button(class = "rounded-md border border-red-300 bg-white px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-50", `type` = "button"):
+          text "Reset"
+          proc onclick =
+            if confirmReset(): dispatch(Msg(kind: resetRequest))
 
 setRenderer app, "app"

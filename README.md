@@ -19,6 +19,8 @@ A single-page DNA sequencing request application written in Nim using [Karax](ht
 
 The application does not currently submit requests to a backend.
 
+Progress is saved in this browser's localStorage and restored when the page is reopened on the same origin. It is not shared across browsers or devices, and clearing browser site data removes it. Form contents remain accessible to anyone using the same browser profile; use Reset to remove the saved request on shared computers. Browser storage limits and privacy settings may prevent saving, in which case the page displays a warning.
+
 ## Project layout
 
 ```text

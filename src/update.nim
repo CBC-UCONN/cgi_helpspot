@@ -7,7 +7,7 @@ type
   MsgKind* = enum
     setProjectField, blurProjectField,
     addSample, removeSample, setSampleCell, blurSampleCell, fillSampleCells,
-    downloadTemplate, csvLoaded, submitRequest
+    downloadTemplate, csvLoaded, submitRequest, resetRequest
 
   Msg* = object
     kind*: MsgKind
@@ -113,6 +113,10 @@ proc sendRequest*(model: AppModel) =
 
 proc update*(m: var AppModel; msg: Msg) =
   case msg.kind
+  of resetRequest:
+    let revision = m.sampleRevision + 1
+    m = initialModel()
+    m.sampleRevision = revision
   of setProjectField:
     setProjectValue(m.project, msg.column, msg.value, msg.boolValue)
     m.editedFields.incl(msg.column)
