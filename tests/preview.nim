@@ -1,4 +1,4 @@
-import ../src/[model, update, helpspot_api, main]
+import ../src/[model, update, io, main]
 
 proc previewModel(): AppModel =
   result = initialModel()
@@ -7,6 +7,7 @@ proc previewModel(): AppModel =
     ("contact_email", "alex.morgan@example.com"),
     ("principal_investigator", "José François"),
     ("pi_email", "jordan.lee@example.com"),
+    ("po_number", "PO123456"),
     ("institution", "UConn (Storrs, Avery Point, or other)"),
     ("is_isg_member", "Yes"),
     ("library_preparation", "Library preparation needed"),

@@ -131,6 +131,7 @@ suite "blur validation and submission":
     state.samples[0]["concentration_ng_ul"] = "1"
     state.samples[0]["volume_ul"] = "1"
     state.samples[0]["read_depth"] = "1"
+    state.samples[0]["sample_disposition"] = "Return to submitter"
     state.samples[0]["library_id"] = "library1"
     update(state, Msg(kind: submitRequest))
     check state.errors.len == 0

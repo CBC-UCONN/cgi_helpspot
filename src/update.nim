@@ -1,7 +1,7 @@
 import std/[strutils, tables, sets, unicode]
 import model
 import validation
-import csvio
+import io
 
 type
   MsgKind* = enum

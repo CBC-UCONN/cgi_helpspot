@@ -13,7 +13,7 @@ All application source belongs in `/src`.
 - `src/main.nim`: Karax rendering and browser event wiring.
 - `src/validators.nim`: reusable validation functions.
 - `src/validation.nim`: schema-driven and cross-row validation.
-- `src/csvio.nim`: CSV parsing/export and schema-derived column handling.
+- `src/io.nim`: project serialization, CSV parsing/export, and schema-derived column handling.
 
 Do not use `import karax/prelude`. Import the specific Karax modules needed by the code.
 

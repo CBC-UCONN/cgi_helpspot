@@ -1,4 +1,4 @@
-import std/[strutils, sequtils]
+import std/[strutils, sequtils, json]
 import model
 
 proc sampleColumns*(p: ProjectForm): seq[string] =
@@ -10,6 +10,23 @@ proc csvEscape*(value: string): string =
     '"' & value.replace("\"", "\"\"") & '"'
   else:
     value
+
+proc projectMessage*(project: ProjectForm): string =
+  for fieldDef in projectSchema:
+    result.add fieldDef.label & ": " & project.field(fieldDef.key) & "\n"
+
+proc projectYaml*(project: ProjectForm): string =
+  for fieldDef in projectSchema:
+    result.add fieldDef.key & ": " & $(%project.field(fieldDef.key)) & "\n"
+
+proc samplesCsv*(state: AppModel): string =
+  let columns = sampleColumns(state.project)
+  result = columns.join(",") & "\n"
+  for row in state.samples:
+    var values: seq[string]
+    for column in columns:
+      values.add csvEscape(row.field(column))
+    result.add values.join(",") & "\n"
 
 proc templateCsv*(p: ProjectForm): string =
   let columns = visibleSampleColumns(p)

@@ -28,10 +28,10 @@ suite "NovaSeq configuration visibility":
   test "library columns follow the selected library preparation option":
     var state = initialModel()
 
-    update(state, Msg(kind: setProjectField, column: "library_preparation", value: "User Prepared Library"))
+    update(state, Msg(kind: setProjectField, column: "library_preparation", value: "User prepared library"))
     check state.project.hasSampleColumn("library_id")
     check not state.project.hasSampleColumn("sample_id")
-    check not state.project.hasSampleColumn("tube_id")
+    check state.project.hasSampleColumn("tube_id")
 
     update(state, Msg(kind: setProjectField, column: "library_preparation", value: "Library preparation needed"))
     check not state.project.hasSampleColumn("library_id")

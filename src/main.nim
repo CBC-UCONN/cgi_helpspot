@@ -1,7 +1,7 @@
 import std/[jsffi, strutils]
 import karax/[karaxdsl, vdom, kbase]
 import karax/karax
-import model, update, csvio, persistence, helpspot_api
+import model, update, io, persistence, helpspot_api
 
 proc readSavedModel(): cstring {.importjs: """
   (function() {

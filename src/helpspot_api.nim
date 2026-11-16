@@ -1,5 +1,5 @@
-import std/[json, strutils, xmlparser, xmltree, asyncjs, jsfetch, httpcore, base64, parsecfg, streams]
-import model, csvio
+import std/[strutils, xmlparser, xmltree, asyncjs, jsfetch, httpcore, base64, parsecfg, streams]
+import model, io
 
 const helpSpotUrl* = static:
   let config = loadConfig(newStringStream(staticRead("../config.ini")))
@@ -12,24 +12,6 @@ const helpSpotCategory* = static:
 const helpSpotReportingTags* = static:
   let config = loadConfig(newStringStream(staticRead("../config.ini")))
   config.getSectionValue("helpspot", "reportingTags")
-
-proc projectMessage*(project: ProjectForm): string =
-  for fieldDef in projectSchema:
-    result.add fieldDef.label & ": " & project.field(fieldDef.key) & "\n"
-
-proc projectYaml*(project: ProjectForm): string =
-  for fieldDef in projectSchema:
-    result.add fieldDef.key & ": " & $(%project.field(fieldDef.key)) & "\n"
-
-proc samplesCsv*(state: AppModel): string =
-  let columns = sampleColumns(state.project)
-  result = columns.join(",") & "\n"
-  for row in state.samples:
-    var values: seq[string]
-    for column in columns:
-      values.add csvEscape(row.field(column))
-    result.add values.join(",") & "\n"
-
 
 proc responseMessage*(body: string; ok: bool; status: int): string =
   var root: XmlNode
