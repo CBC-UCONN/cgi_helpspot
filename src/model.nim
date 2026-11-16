@@ -112,16 +112,13 @@ let
     "NEBNext Ultra II RNA Library Prep Kit",
     "Illumina DNA Prep Kit",
     "Illumina RNA Prep Kit",
-
   ]
-
-
 
 let projectSchema* = @[
 
   # Contact name
   ProjectFieldDef(
-    key: "contact_name", label: "Contact name", kind: textField, required: true,
+    key: "contact_name", label: "Contact Name", kind: textField, required: true,
     validators: @[maxLength(120)],
     help: "Name of primary contact person."
   ),
@@ -135,7 +132,7 @@ let projectSchema* = @[
 
   # Principal investigator
   ProjectFieldDef(
-    key: "principal_investigator", label: "Principal investigator", kind: textField, required: true,
+    key: "principal_investigator", label: "Principal Investigator", kind: textField, required: true,
     validators: @[maxLength(120)],
     help: "Name of the principal investigator."
   ),
@@ -149,21 +146,21 @@ let projectSchema* = @[
 
   # Institution
   ProjectFieldDef(
-    key: "institution", label: "Institution", kind: selectField,
+    key: "institution", label: "Institution", kind: selectField, required: true,
     options: institutionOptions, 
     help: "Select the institution associated with this project.",
   ),
 
   # ISG member
   ProjectFieldDef(
-    key: "is_isg_member", label: "ISG member", kind: choiceField,
+    key: "is_isg_member", label: "ISG Member", kind: choiceField, required: true,
     options: membershipOptions, 
     help: "Indicate if the submitter is an ISG member.",
   ),
 
   # PO number
   ProjectFieldDef(
-    key: "po_number", label: "PO number", kind: textField,
+    key: "po_number", label: "PO Number", kind: textField, required: true,
     validators: @[maxLength(60)],
     help: "Purchase order number.",
   ),
@@ -178,7 +175,7 @@ let projectSchema* = @[
 
   # Instrument
   ProjectFieldDef(
-    key: "instrument", label: "Instrument", kind: selectField,
+    key: "instrument", label: "Instrument", kind: selectField, required: true,
     options: instrumentOptions, 
     help: "Select the instrument used for the project.",
     spreadsheetDependency: true,
@@ -186,7 +183,7 @@ let projectSchema* = @[
 
   # NovaSeq configuration
   ProjectFieldDef(
-    key: "novaseq_configuration", label: "NovaSeq Configuration", kind: selectField,
+    key: "novaseq_configuration", label: "NovaSeq Configuration", kind: selectField, required: true,
     options: novaseqOptions, 
     displayIf: proc(project: ProjectForm): bool =
     project.field("instrument") == "Illumina NovaSeq 6000",
@@ -194,17 +191,17 @@ let projectSchema* = @[
   ),
 
 
-  # Description
+  # Additional Information
   ProjectFieldDef(
-    key: "description", label: "Description", kind: textareaField,
+    key: "additional_information", label: "Additional Information", kind: textareaField,
     fullWidth: true,
     validators: @[maxLength(4000)],
-    help: "Describe the project and any relevant requirements.", 
+    help: "Include any additional information relevant to the project here.", 
   ),
 
-  # IRB certification
+  # IRB Certification
   ProjectFieldDef(
-    key: "irb_certification", label: "IRB certification", kind: choiceField, required: true,
+    key: "irb_certification", label: "IRB Certification", kind: choiceField, required: true,
     options: irbOptions, 
     fullWidth: true,
     help: "In accordance with the University of Connecticut - Storrs Institutional Review Board (IRB), any DNA/RNA samples derived from human subjects being submitted to the Center for Genome Innovation for processing (includes all listed services provided by the CGI or Chromosome Core) must be covered by an approved and active IRB protocol. The principal investigator listed on this sample submission form must be the same PI listed on the approved IRB protocol. All human subject sample names must be de-identified. Check the appropriate box."
@@ -219,7 +216,7 @@ let sampleColumnSchema* = @[
     uniqueMessage: "Sample ID must be unique.",
     displayIf: proc(project: ProjectForm): bool =
       project.field("library_preparation") == "Library preparation needed",
-    validators: @[maxLength(50), allowedChars(identifierChars, "letters, numbers, underscores, hyphens, and periods")],
+    validators: @[maxLength(50), allowedChars(identifierChars, "letters, numbers, \"_\", \"-\", and \".\"")],
   ),
 
   # Library ID
@@ -229,12 +226,12 @@ let sampleColumnSchema* = @[
     uniqueMessage: "Library ID must be unique.",
     displayIf: proc(project: ProjectForm): bool =
       project.field("library_preparation") == "User prepared library",
-    validators: @[maxLength(50), allowedChars(identifierChars, "letters, numbers, underscores, hyphens, and periods")],
+    validators: @[maxLength(50), allowedChars(identifierChars, "letters, numbers, \"_\", \"-\", and \".\"")],
   ),
   
   # Tube ID
   SampleColumnDef(
-    key: "tube_id", label: "Tube ID", required: true, widthClass: "min-w-28",
+    key: "tube_id", label: "Tube ID", required: true, widthClass: "min-w-20",
     help: "Up to 10 letters, numbers, underscores, hyphens, or periods.",
     validators: @[maxLength(10), allowedChars(identifierChars, "letters, numbers, underscores, hyphens, and periods")],
   ),
@@ -242,13 +239,14 @@ let sampleColumnSchema* = @[
   # Organism
   SampleColumnDef(
     key: "organism", label: "Organism", required: true, widthClass: "min-w-40",
+    help: "Name of the organism or group of organisms.",
     validators: @[maxLength(120)],
-    help: "Name of the organism or group of organisms."
   ),
 
   # Sample type
   SampleColumnDef(
-    key: "sample_type", label: "Sample type", required: true, widthClass: "min-w-36",
+    key: "sample_type", label: "Sample type", required: true, widthClass: "min-w-16",
+    help: "Select type of sample from options.",
     options: sampleTypeOptions, 
     validators: @[oneOf(sampleTypeOptions)],
     displayIf: proc(project: ProjectForm): bool =
@@ -257,7 +255,8 @@ let sampleColumnSchema* = @[
 
   # Library type
   SampleColumnDef(
-    key: "library_type", label: "Library type", widthClass: "min-w-40",
+    key: "library_type", label: "Library type", required: true,widthClass: "min-w-40",
+    help: "Select type of library from options.",
     options: libraryPrepOptions,
     validators: @[maxLength(100)],
     displayIf: proc(project: ProjectForm): bool =
@@ -267,28 +266,31 @@ let sampleColumnSchema* = @[
   # Concentration (ng/uL)
   SampleColumnDef(
     key: "concentration_ng_ul", label: "Concentration (ng/uL)", required: true, widthClass: "min-w-40",
+    help: "Concentration of the sample in ng/uL.",
     validators: @[numberRange(0, 10000)],
   ),
 
   # Volume (uL)
   SampleColumnDef(
-    key: "volume_ul", label: "Volume (uL)", required: true, widthClass: "min-w-32",
+    key: "volume_ul", label: "Volume (uL)", required: true, widthClass: "min-w-26",
+    help: "Volume of the sample in uL.",
     validators: @[numberRange(0, 10000)],
   ),
 
   # Desired Read depth
   SampleColumnDef(
     key: "read_depth", label: "Desired Read Depth", required: true, widthClass: "min-w-32",
+    help: "Desired mean read depth per base for the sample.",
     validators: @[numberRange(0, 10000)],
   ),
 
   # i7 Index
   SampleColumnDef(
-    key: "i7_index", label: "i7 Index", widthClass: "min-w-40",
+    key: "i7_index", label: "i7 Index", required: true, widthClass: "min-w-40",
+    help: "i7 Index sequence. Valid values are A, C, G, T, or N",
     validators: @[maxLength(40), allowedChars(indexChars, "A, C, G, T, or N allowed")],
     displayIf: proc(project: ProjectForm): bool =
       project.field("library_preparation") == "User prepared library",
-    help: "i7 Index sequence. Valid values are A, C, G, T, or N",
   ),
 
   # i5 Index

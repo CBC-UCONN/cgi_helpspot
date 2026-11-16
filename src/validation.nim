@@ -1,13 +1,14 @@
-import std/[strutils, tables]
+import std/[strutils, tables, unicode]
 import model
 
 proc validateProjectField*(project: ProjectForm; key: string): seq[ValidationError] =
   for fieldDef in visibleProjectFields(project):
     if fieldDef.key == key:
-      if (fieldDef.required or fieldDef.spreadsheetDependency) and project.field(key).strip().len == 0:
+      let value = unicode.strip(project.field(key))
+      if (fieldDef.required or fieldDef.spreadsheetDependency) and value.len == 0:
         result.add ValidationError(field: key, message: fieldDef.label & " is required.")
       for validator in fieldDef.validators:
-        let message = validator(project.field(key))
+        let message = validator(value)
         if message.len > 0:
           result.add ValidationError(field: key, message: message)
       break
@@ -17,7 +18,7 @@ proc validateSampleColumn*(rows: seq[SampleRow]; project: ProjectForm; key: stri
     if column.key == key:
       var seen = initTable[string, int]()
       for index, row in rows:
-        let value = row.field(key)
+        let value = unicode.strip(row.field(key))
         let errorKey = "sample[" & $(index + 1) & "]." & key
         if column.required and value.strip().len == 0:
           result.add ValidationError(field: errorKey, message: column.label & " is required.")
@@ -36,7 +37,7 @@ proc validateSampleColumn*(rows: seq[SampleRow]; project: ProjectForm; key: stri
 
 proc validateProject*(project: ProjectForm): seq[ValidationError] =
   for fieldDef in visibleProjectFields(project):
-    let value = project.field(fieldDef.key)
+    let value = unicode.strip(project.field(fieldDef.key))
     if (fieldDef.required or fieldDef.spreadsheetDependency) and value.strip().len == 0:
       result.add ValidationError(field: fieldDef.key, message: fieldDef.label & " is required.")
     for validator in fieldDef.validators:
@@ -47,7 +48,7 @@ proc validateProject*(project: ProjectForm): seq[ValidationError] =
 proc validateSample*(row: SampleRow; index: int; project: ProjectForm): seq[ValidationError] =
   let prefix = "sample[" & $(index + 1) & "]."
   for column in visibleSampleColumns(project):
-    let value = field(row, column.key)
+    let value = unicode.strip(field(row, column.key))
     if column.required and value.strip().len == 0:
       result.add ValidationError(field: prefix & column.key, message: column.label & " is required.")
     for validator in column.validators:
@@ -59,7 +60,7 @@ proc validateSamples*(rows: seq[SampleRow]; project: ProjectForm): seq[Validatio
   var seen = initTable[string, int]()
   for index, row in rows:
     result.add validateSample(row, index, project)
-    let id = row.field("sample_id").strip()
+    let id = unicode.strip(row.field("sample_id"))
     if id.len > 0:
       if seen.hasKey(id):
         result.add ValidationError(

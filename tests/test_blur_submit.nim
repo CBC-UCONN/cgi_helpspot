@@ -5,6 +5,27 @@ proc hasField(state: AppModel; key: string): bool =
   state.errors.anyIt(it.field == key)
 
 suite "blur validation and submission":
+  test "trim fields before blur validation and on submit":
+    var state = initialModel()
+    state.samples = @[emptySample()]
+    update(state, Msg(kind: setProjectField, column: "library_preparation", value: "Library preparation needed"))
+    update(state, Msg(kind: setProjectField, column: "contact_email", value: "  name@example.com  "))
+    update(state, Msg(kind: blurProjectField, column: "contact_email"))
+    check state.project.field("contact_email") == "name@example.com"
+    check not state.hasField("contact_email")
+    update(state, Msg(kind: setSampleCell, row: 0, column: "sample_id", value: "  sample1  "))
+    update(state, Msg(kind: blurSampleCell, row: 0, column: "sample_id"))
+    check state.samples[0].field("sample_id") == "sample1"
+    check not state.hasField("sample[1].sample_id")
+    update(state, Msg(kind: setProjectField, column: "contact_name", value: "\xC2\xA0Jane Doe\xC2\xA0"))
+    update(state, Msg(kind: blurProjectField, column: "contact_name"))
+    check state.project.field("contact_name") == "Jane Doe"
+    update(state, Msg(kind: setProjectField, column: "additional_information", value: "  first line\nsecond line  "))
+    update(state, Msg(kind: setSampleCell, row: 0, column: "notes", value: "  sample notes  "))
+    update(state, Msg(kind: submitRequest))
+    check state.project.field("additional_information") == "first line\nsecond line"
+    check state.samples[0].field("notes") == "sample notes"
+
   test "only edited fields validate on blur":
     var state = initialModel()
     update(state, Msg(kind: blurProjectField, column: "contact_name"))
@@ -96,6 +117,9 @@ suite "blur validation and submission":
     state.project["contact_email"] = "name@example.com"
     state.project["principal_investigator"] = "PI"
     state.project["pi_email"] = "pi@example.com"
+    state.project["institution"] = "UConn Health"
+    state.project["is_isg_member"] = "Yes"
+    state.project["po_number"] = "PO-123"
     state.project["library_preparation"] = "Library preparation needed"
     state.project["instrument"] = "PacBio Revio"
     for fieldDef in projectSchema:

@@ -1,4 +1,4 @@
-import std/[strutils, tables, sets]
+import std/[strutils, tables, sets, unicode]
 import model
 import validation
 import csvio
@@ -122,6 +122,8 @@ proc update*(m: var AppModel; msg: Msg) =
     m.submissionMessage = ""
   of blurProjectField:
     if msg.column in m.editedFields:
+      if m.project.hasKey(msg.column):
+        m.project[msg.column] = unicode.strip(m.project[msg.column])
       m.replaceFieldErrors(msg.column, validateProjectField(m.project, msg.column))
       if m.hasFieldError(msg.column): m.liveFields.incl(msg.column)
       else: m.liveFields.excl(msg.column)
@@ -176,6 +178,8 @@ proc update*(m: var AppModel; msg: Msg) =
     if msg.row >= 0 and msg.row < m.samples.len:
       let key = "sample[" & $(msg.row + 1) & "]." & msg.column
       if key in m.editedFields:
+        if m.samples[msg.row].hasKey(msg.column):
+          m.samples[msg.row][msg.column] = unicode.strip(m.samples[msg.row][msg.column])
         m.refreshSampleColumn(key, msg.column)
         if m.hasFieldError(key): m.liveFields.incl(key)
         else: m.liveFields.excl(key)
@@ -219,6 +223,11 @@ proc update*(m: var AppModel; msg: Msg) =
       m.submissionMessage = ""
   of submitRequest:
     if m.submitting: return
+    for fieldDef in projectSchema:
+      m.project[fieldDef.key] = unicode.strip(m.project.field(fieldDef.key))
+    for index in 0 ..< m.samples.len:
+      for column in sampleColumnSchema:
+        m.samples[index][column.key] = unicode.strip(m.samples[index].field(column.key))
     m.errors = validateAll(m)
     for error in m.errors: m.liveFields.incl(error.field)
     if m.errors.len == 0:

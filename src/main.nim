@@ -388,14 +388,14 @@ proc sampleTable(): VNode =
       tdiv(class = "mx-6 mt-4 rounded-lg bg-blue-50 px-4 py-3 text-sm text-blue-800"): text state.csvMessage
     tdiv(class = "relative overflow-x-auto"):
       tdiv(class = (if dependenciesSelected: "" else: "pointer-events-none select-none blur-sm"), `aria-hidden` = (if dependenciesSelected: "false" else: "true")):
-        table(class = "w-max table-auto border-collapse"):
+        table(class = "w-full table-auto border-collapse"):
           if dependenciesSelected:
             thead(class = "bg-slate-50"):
               tr:
                 th(class = "w-9 border border-slate-300 px-1 py-2 text-center text-xs font-medium text-slate-500"): text "#"
                 for column in columns:
                   th(class = column.widthClass & " border border-slate-300 px-2 py-2 text-left text-xs font-semibold text-slate-600"):
-                    tdiv(class = "inline-flex items-center gap-1"):
+                    tdiv(class = "flex items-center gap-1 whitespace-normal break-words"):
                       text column.label
                       if column.help.len > 0:
                         helpInfo("sample-" & column.key, column.help)
