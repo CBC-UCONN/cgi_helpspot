@@ -7,7 +7,7 @@ type
   MsgKind* = enum
     setProjectField, blurProjectField,
     addSample, removeSample, setSampleCell, blurSampleCell, fillSampleCells,
-    downloadTemplate, csvLoaded, submitRequest, resetRequest
+    downloadTemplate, csvLoaded, submitRequest, submissionFinished, resetRequest
 
   Msg* = object
     kind*: MsgKind
@@ -107,9 +107,6 @@ proc refreshSampleColumn(m: var AppModel; key: string; column: string) =
       refresh.add error.field
   for fieldKey in refresh:
     m.replaceFieldErrors(fieldKey, errors)
-
-proc sendRequest*(model: AppModel) =
-  discard
 
 proc update*(m: var AppModel; msg: Msg) =
   case msg.kind
@@ -221,10 +218,15 @@ proc update*(m: var AppModel; msg: Msg) =
       m.liveFields = live
       m.submissionMessage = ""
   of submitRequest:
+    if m.submitting: return
     m.errors = validateAll(m)
     for error in m.errors: m.liveFields.incl(error.field)
     if m.errors.len == 0:
-      sendRequest(m)
-      m.submissionMessage = "Validation passed. Submission is not yet connected."
+      m.submitting = true
+      m.submissionMessage = "Submitting request..."
     else:
       m.submissionMessage = "Please correct the highlighted fields."
+  of submissionFinished:
+    if m.submitting:
+      m.submitting = false
+      m.submissionMessage = msg.value

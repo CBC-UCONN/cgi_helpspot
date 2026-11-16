@@ -56,6 +56,7 @@ type
     liveFields*: HashSet[string]
     csvMessage*: string
     submissionMessage*: string
+    submitting*: bool
 
 proc alwaysVisible*(project: ProjectForm): bool = true
 

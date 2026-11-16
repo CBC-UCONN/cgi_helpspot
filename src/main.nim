@@ -1,7 +1,15 @@
-import std/[jsffi, strutils]
+import std/[jsffi, strutils, parsecfg, streams]
 import karax/[karaxdsl, vdom, kbase]
 import karax/karax
-import model, update, csvio, persistence
+import model, update, csvio, persistence, helpspot_api
+
+const helpSpotUrl = static:
+  let config = loadConfig(newStringStream(staticRead("../config.ini")))
+  config.getSectionValue("helpspot", "url")
+
+const helpSpotCategory = static:
+  let config = loadConfig(newStringStream(staticRead("../config.ini")))
+  config.getSectionValue("helpspot", "category")
 
 proc readSavedModel(): cstring {.importjs: """
   (function() {
@@ -182,6 +190,7 @@ elif ($savedModel).len > 0 and not decodeModel($savedModel, state):
 
 proc dispatch(msg: Msg) =
   if msg.kind == resetRequest:
+    if state.submitting: return
     if not clearSavedModel():
       storageMessage = "Progress could not be cleared. Reset was cancelled."
       syncStorageMessage(cstring(storageMessage))
@@ -191,7 +200,16 @@ proc dispatch(msg: Msg) =
     storageMessage = ""
     syncStorageMessage(cstring(storageMessage))
     return
+  let wasSubmitting = state.submitting
   update(state, msg)
+  if msg.kind == submitRequest and not wasSubmitting and state.submitting:
+    if helpSpotUrl.len == 0:
+      update(state, Msg(kind: submissionFinished, value: "HelpSpot URL is not configured."))
+    else:
+      discard postHelpSpot(helpSpotUrl, helpSpotCategory, state,
+        proc(message: string) =
+          dispatch(Msg(kind: submissionFinished, value: message))
+          redraw())
   if not saveModel(cstring(encodeModel(state))):
     storageMessage = "Progress could not be saved in this browser."
   else:
@@ -418,7 +436,7 @@ proc app(): VNode =
           p(class = "text-sm font-semibold uppercase tracking-wider text-blue-600"): text "UConn Center for Genome Innovation"
           h1(class = "mt-1 text-2xl font-bold tracking-tight text-slate-900"): text "Sequencing Request Form"
           p(class = "mt-1 max-w-2xl text-sm text-slate-500"): text "Enter project and sample details below."
-        button(class = "rounded-md bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800", `type` = "button"):
+        button(class = "rounded-md bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-50", `type` = "button", disabled = state.submitting):
           text "Submit request"
           proc onclick = dispatch(Msg(kind: submitRequest))
     main(class = "space-y-6 px-6 py-8"):
@@ -429,7 +447,7 @@ proc app(): VNode =
         projectSection()
       sampleTable()
       tdiv(class = "flex justify-end"):
-        button(class = "rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50", `type` = "button"):
+        button(class = "rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50", `type` = "button", disabled = state.submitting):
           text "Reset"
           proc onclick =
             if confirmReset(): dispatch(Msg(kind: resetRequest))

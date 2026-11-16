@@ -83,18 +83,21 @@ suite "blur validation and submission":
 
   test "invalid submit validates all fields":
     var state = initialModel()
+    state.project["library_preparation"] = "Library preparation needed"
     update(state, Msg(kind: submitRequest))
     check state.hasField("contact_name")
     check state.hasField("sample[1].sample_id")
     check state.submissionMessage == "Please correct the highlighted fields."
 
-  test "valid submit reaches the unconnected stub":
+  test "valid submit starts and completes submission":
     var state = initialModel()
     state.samples = @[emptySample()]
     state.project["contact_name"] = "Name"
     state.project["contact_email"] = "name@example.com"
     state.project["principal_investigator"] = "PI"
-    state.project["contact_pi"] = "Contact"
+    state.project["pi_email"] = "pi@example.com"
+    state.project["library_preparation"] = "Library preparation needed"
+    state.project["instrument"] = "PacBio Revio"
     for fieldDef in projectSchema:
       if fieldDef.key == "irb_certification": state.project[fieldDef.key] = fieldDef.options[0]
     state.samples[0]["sample_id"] = "sample1"
@@ -107,4 +110,8 @@ suite "blur validation and submission":
     state.samples[0]["library_id"] = "library1"
     update(state, Msg(kind: submitRequest))
     check state.errors.len == 0
-    check state.submissionMessage == "Validation passed. Submission is not yet connected."
+    check state.submitting
+    check state.submissionMessage == "Submitting request..."
+    update(state, Msg(kind: submissionFinished, value: "Request submitted."))
+    check not state.submitting
+    check state.submissionMessage == "Request submitted."

@@ -25,3 +25,6 @@ proc buildApp() =
 
 task buildWeb, "Build the sequencing request application":
   buildApp()
+
+task testHelpSpot, "Submit a real test request to the configured HelpSpot API":
+  exec "nim js -d:nodejs -r --out:" & quoteShell(getTempDir() / "seqrequest-helpspot-live.js") & " tests/submit_helpspot_test.nim"

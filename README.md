@@ -17,7 +17,7 @@ A single-page DNA sequencing request application written in Nim using [Karax](ht
 - Tailwind CSS styling.
 - No server is required for the UI itself.
 
-The application does not currently submit requests to a backend.
+Submitting a validated request sends the project details in the HelpSpot note and as a YAML attachment, with the currently visible sample columns in a CSV attachment.
 
 Progress is saved in this browser's localStorage and restored when the page is reopened on the same origin. It is not shared across browsers or devices, and clearing browser site data removes it. Form contents remain accessible to anyone using the same browser profile; use Reset to remove the saved request on shared computers. Browser storage limits and privacy settings may prevent saving, in which case the page displays a warning.
 
@@ -103,9 +103,13 @@ Add a `ProjectFieldDef` to `projectSchema` in `src/model.nim`. Supply its kind, 
 
 Add a `SampleColumnDef` to `sampleColumnSchema`. Sample storage, the table, and CSV import/export use its key automatically.
 
-### Connect submission
+### HelpSpot submission
 
-A production implementation can add a submission action that validates the full `AppModel` before sending it to an API, ideally as JSON, and handles loading/success/error states with additional messages in `MsgKind`.
+Set the public `request.create` URL and category ID in `config.ini` and run `nimble buildWeb` after changing them. Quote the URL in the INI file. These settings are included in the browser bundle and must not contain credentials or secrets.
+
+Run `nimble testHelpSpot` to create a real, clearly labeled test request in the configured category, including YAML and CSV attachments. It uses Node.js 18 or newer and the same model update and HelpSpot client as the application. The test uses `helpspot-test@example.com` as a placeholder contact address; it cannot receive notification emails. The task exits unsuccessfully if the submission cannot be confirmed. Check HelpSpot for an existing test request before retrying after a network error.
+
+Enable HelpSpot's public API and ensure the HelpSpot endpoint allows cross-origin requests from the application's origin, or serve the application through a same-origin reverse proxy. Category-specific required custom fields and attachment restrictions must also be configured in HelpSpot. A network or CORS error can occur after HelpSpot has received a request, so check for an existing request before retrying.
 
 ## Design principles
 
