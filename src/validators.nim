@@ -44,3 +44,8 @@ proc numberRange*(minimum, maximum: float; integer = false): Validator =
     except ValueError:
       return "Enter a valid number."
 
+proc plateWellFormat*(): Validator =
+  result = proc(value: string): string =
+    let v = value.strip()
+    if v.len > 0 and not (v.len == 2 and v[0] in 'A'..'H' and v[1] in '1'..'9' or v.len == 3 and v[0] in 'A'..'H' and v[1..2] == "10" or v[1..2] == "11" or v[1..2] == "12"):
+      return "Enter a valid plate well (A1-A12, B1-B12, ..., H1-H12)."

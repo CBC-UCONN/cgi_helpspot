@@ -114,6 +114,13 @@ let
     "Illumina RNA Prep Kit",
   ]
 
+  containerOptions = @[
+    "Tube",
+    "96 Well Plate",
+  ]
+
+
+
 let projectSchema* = @[
 
   # Contact name
@@ -173,6 +180,14 @@ let projectSchema* = @[
     spreadsheetDependency: true,
   ),
 
+  # Container Type
+  ProjectFieldDef(
+    key: "container_type", label: "Container Type", kind: selectField, required: true,
+    options: containerOptions,
+    help: "Select the type of container or vessel the samples are stored in.",
+    spreadsheetDependency: true,
+  ),
+
   # Instrument
   ProjectFieldDef(
     key: "instrument", label: "Instrument", kind: selectField, required: true,
@@ -189,7 +204,6 @@ let projectSchema* = @[
     project.field("instrument") == "Illumina NovaSeq 6000",
     help: "Select the NovaSeq configuration used for the project.",
   ),
-
 
   # Additional Information
   ProjectFieldDef(
@@ -212,7 +226,7 @@ let sampleColumnSchema* = @[
   # Sample ID
   SampleColumnDef(
     key: "sample_id", label: "Sample ID", required: true, widthClass: "min-w-40",
-    help: "Unique ID using letters, numbers, underscores, hyphens, or periods.",
+    help: "Unique ID using letters, numbers, \"_\", \"-\", and \".\".",
     uniqueMessage: "Sample ID must be unique.",
     displayIf: proc(project: ProjectForm): bool =
       project.field("library_preparation") == "Library preparation needed",
@@ -222,7 +236,7 @@ let sampleColumnSchema* = @[
   # Library ID
   SampleColumnDef(
     key: "library_id", label: "Library ID", required: true, widthClass: "min-w-40",
-    help: "Unique ID using letters, numbers, underscores, hyphens, or periods.",
+    help: "Unique ID using letters, numbers, \"_\", \"-\", and \".\".",
     uniqueMessage: "Library ID must be unique.",
     displayIf: proc(project: ProjectForm): bool =
       project.field("library_preparation") == "User prepared library",
@@ -232,8 +246,28 @@ let sampleColumnSchema* = @[
   # Tube ID
   SampleColumnDef(
     key: "tube_id", label: "Tube ID", required: true, widthClass: "min-w-24",
-    help: "Up to 10 letters, numbers, underscores, hyphens, or periods.",
-    validators: @[maxLength(10), allowedChars(identifierChars, "letters, numbers, underscores, hyphens, and periods")],
+    help: "Up to 10 letters, numbers, \"_\", \"-\", and \".\".",
+    validators: @[maxLength(10), allowedChars(identifierChars, "letters, numbers, \"_\", \"-\", and \".\"")],
+    displayIf: proc(project: ProjectForm): bool =
+      project.field("container_type") == "Tube",
+  ),
+
+  # Plate ID
+  SampleColumnDef(
+    key: "plate_id", label: "Plate ID", required: true, widthClass: "min-w-24",
+    help: "Unique ID for the container using letters, numbers, \"_\", \"-\", and \".\".",
+    validators: @[maxLength(50), allowedChars(identifierChars, "letters, numbers, \"_\", \"-\", and \".\"")],
+    displayIf: proc(project: ProjectForm): bool =
+      project.field("container_type") == "Plate",
+  ),
+
+  # Plate Well
+  SampleColumnDef(
+    key: "plate_well", label: "Plate Well", required: true, widthClass: "min-w-24",
+    help: "Well identifier within the plate (A1-A12, B1-B12, ..., H1-H12)",
+    validators: @[maxLength(10), plateWellFormat()],
+    displayIf: proc(project: ProjectForm): bool =
+      project.field("container_type") == "Plate",
   ),
 
   # Organism

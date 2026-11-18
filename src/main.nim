@@ -382,7 +382,6 @@ proc sampleTable(): VNode =
   for fieldDef in projectSchema:
     if fieldDef.spreadsheetDependency:
       dependencyLabels.add fieldDef.label
-  let dependencyMessage = "Choose options for " & dependencyLabels.join(" and ") & " before entering sample data."
   buildHtml(section(class = "rounded-2xl border border-slate-200 bg-white shadow-sm")):
     tdiv(class = "flex flex-col gap-4 border-b border-slate-200 p-6 sm:flex-row sm:items-center sm:justify-between"):
       tdiv:
@@ -435,7 +434,15 @@ proc sampleTable(): VNode =
       if not dependenciesSelected:
         tdiv(class = "pointer-events-none absolute inset-0 z-10 flex min-h-64 items-center justify-center px-6 text-center", role = "status"):
           p(class = "max-w-md text-sm font-semibold text-slate-900 drop-shadow-[0_1px_2px_rgba(255,255,255,0.95)]"):
-            text dependencyMessage
+            text "Choose options for "
+            for i, label in dependencyLabels:
+              discard
+              if i > 0:
+                text (if i == dependencyLabels.high: " and " else: ", ")
+              span(class = "font-bold underline"):
+                text label
+            text " before entering sample data."
+
     tdiv(class = "flex flex-col gap-3 border-t border-slate-200 p-6 sm:flex-row sm:items-center sm:justify-between"):
       button(class = (if dependenciesSelected: "rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800" else: "cursor-not-allowed rounded-lg bg-slate-400 px-4 py-2 text-sm font-semibold text-white"), `type` = "button", disabled = not dependenciesSelected):
         text "+ Add sample"
