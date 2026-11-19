@@ -123,10 +123,17 @@ let
 
 let projectSchema* = @[
 
-  # Contact name
+  # Project Name
+  ProjectFieldDef(
+    key: "project_name", label: "Project Name", kind: textField, required: true,
+    validators: @[maxLength(80)],
+    help: "Name of the project."
+  ),
+
+  # Contact Name
   ProjectFieldDef(
     key: "contact_name", label: "Contact Name", kind: textField, required: true,
-    validators: @[maxLength(120)],
+    validators: @[maxLength(80)],
     help: "Name of primary contact person."
   ),
 
@@ -140,14 +147,14 @@ let projectSchema* = @[
   # Principal investigator
   ProjectFieldDef(
     key: "principal_investigator", label: "Principal Investigator", kind: textField, required: true,
-    validators: @[maxLength(120)],
+    validators: @[maxLength(80)],
     help: "Name of the principal investigator."
   ),
 
   # Contact PI
   ProjectFieldDef(
     key: "pi_email", label: "PI email", kind: textField, required: true,
-    validators: @[maxLength(120)],
+    validators: @[maxLength(80)],
     help: "Email address of the PI contact."
   ),
 
@@ -209,7 +216,7 @@ let projectSchema* = @[
   ProjectFieldDef(
     key: "additional_information", label: "Additional Information", kind: textareaField,
     fullWidth: true,
-    validators: @[maxLength(4000)],
+    validators: @[maxLength(1000)],
     help: "Include any additional information relevant to the project here.", 
   ),
 
@@ -348,7 +355,7 @@ let sampleColumnSchema* = @[
   # Notes
   SampleColumnDef(
     key: "additional_information", label: "Additional Information", widthClass: "min-w-48", 
-    validators: @[maxLength(500)],
+    validators: @[maxLength(100)],
   ),
 ]
 
