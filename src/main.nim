@@ -1,7 +1,11 @@
-import std/[jsffi, strutils]
-import karax/[karaxdsl, vdom, kbase]
+{.warning[CStringConv]: off.}
+
+# import std/[jsffi, strutils]
+# import karax/[karaxdsl, vdom, kbase]
+import karax/[karaxdsl, vdom]
 import karax/karax
 import model, update, io, persistence, helpspot_api
+
 
 proc readSavedModel(): cstring {.importjs: """
   (function() {

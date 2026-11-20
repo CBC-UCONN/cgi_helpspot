@@ -1,4 +1,4 @@
-import std/[strutils, tables, unicode]
+import std/[tables, unicode]
 import model
 
 proc validateProjectField*(project: ProjectForm; key: string): seq[ValidationError] =

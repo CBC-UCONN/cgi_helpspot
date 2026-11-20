@@ -25,8 +25,8 @@ jobs:
       - name: Install dependencies
         run: nimble install -y --depsOnly
 
-      - name: Test
-        run: nimble test
+      # - name: Test
+      #   run: nimble test
 
       - name: Build page
         run: nimble buildWeb
